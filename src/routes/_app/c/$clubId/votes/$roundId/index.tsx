@@ -23,6 +23,7 @@ import {
   myBallotQuery,
   nominationsQuery,
   resultsQuery,
+  roundClubBookQuery,
   roundQuery,
 } from '#/lib/queries'
 import type { Nomination, Round } from '#/lib/queries'
@@ -252,17 +253,11 @@ function VotePage() {
       )}
 
       {!open && (
-        <FooterBar>
-          <Button
-            asChild
-            size="lg"
-            variant={round.status === 'closed' ? 'default' : 'outline'}
-          >
-            <Link to="/c/$clubId" params={{ clubId }}>
-              Back to club
-            </Link>
-          </Button>
-        </FooterBar>
+        <ClosedFooter
+          clubId={clubId}
+          roundId={roundId}
+          closed={round.status === 'closed'}
+        />
       )}
 
       <BookSearch
@@ -381,4 +376,39 @@ function ClosedResults({
   const { data } = useQuery(resultsQuery(roundId))
   if (!data) return null
   return <Results tallies={data.tallies} nominations={nominations} />
+}
+
+function ClosedFooter({
+  clubId,
+  roundId,
+  closed,
+}: {
+  clubId: string
+  roundId: string
+  closed: boolean
+}) {
+  const { data: clubBook } = useQuery({
+    ...roundClubBookQuery(roundId),
+    enabled: closed,
+  })
+  return (
+    <FooterBar>
+      {clubBook ? (
+        <Button asChild size="lg">
+          <Link
+            to="/c/$clubId/books/$bookId"
+            params={{ clubId, bookId: clubBook.id }}
+          >
+            Go to {clubBook.book.title}
+          </Link>
+        </Button>
+      ) : (
+        <Button asChild size="lg" variant="outline">
+          <Link to="/c/$clubId" params={{ clubId }}>
+            Back to club
+          </Link>
+        </Button>
+      )}
+    </FooterBar>
+  )
 }

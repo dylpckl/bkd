@@ -20,6 +20,14 @@ async function nominate(page: Page, query: string, title: RegExp) {
   await expect(page.getByText('Your nomination').first()).toBeVisible()
 }
 
+// dnd-kit's keyboard sensor needs a frame between pick-up, moves and drop, as a person would give it.
+async function keys(page: Page, ...presses: string[]) {
+  for (const key of presses) {
+    await page.keyboard.press(key)
+    await page.waitForTimeout(150)
+  }
+}
+
 const ballotTitles = (page: Page) =>
   page
     .getByRole('list', { name: 'Your ranked ballot' })
@@ -67,9 +75,7 @@ test('members rank by keyboard, the ballot autosaves, and closing early shows th
 
   // Move Hail Mary to the top with the keyboard.
   await adam.getByRole('button', { name: /Reorder Project Hail Mary/ }).focus()
-  await adam.keyboard.press('Space')
-  await adam.keyboard.press('ArrowUp')
-  await adam.keyboard.press('Space')
+  await keys(adam, 'Space', 'ArrowUp', 'Space')
   await expect(adam.getByText('✓ Saved')).toBeVisible()
   await adam.reload()
   expect(await ballotTitles(adam)).toEqual(['Project Hail Mary', 'Piranesi'])
@@ -77,10 +83,7 @@ test('members rank by keyboard, the ballot autosaves, and closing early shows th
   // Jimmy votes Piranesi first; the owner votes Hail Mary first by keeping a drop in place.
   await jimmy.reload()
   await jimmy.getByRole('button', { name: /Reorder Piranesi/ }).focus()
-  await jimmy.keyboard.press('Space')
-  await jimmy.keyboard.press('ArrowDown')
-  await jimmy.keyboard.press('ArrowUp')
-  await jimmy.keyboard.press('Space')
+  await keys(jimmy, 'Space', 'ArrowDown', 'ArrowUp', 'Space')
   await expect(jimmy.getByText('✓ Saved')).toBeVisible()
 
   // The owner sees who has voted and closes early.

@@ -402,6 +402,62 @@ export type Database = {
           },
         ]
       }
+      posts: {
+        Row: {
+          author_id: string
+          body: string
+          club_book_id: string
+          created_at: string
+          edited_at: string | null
+          id: string
+          parent_id: string | null
+          section_id: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          author_id?: string
+          body: string
+          club_book_id: string
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+          parent_id?: string | null
+          section_id?: string | null
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          club_book_id?: string
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+          parent_id?: string | null
+          section_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'posts_author_id_fkey'
+            columns: ['author_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'posts_club_book_id_fkey'
+            columns: ['club_book_id']
+            isOneToOne: false
+            referencedRelation: 'club_books'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'posts_parent_id_fkey'
+            columns: ['parent_id']
+            isOneToOne: false
+            referencedRelation: 'posts'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -426,6 +482,55 @@ export type Database = {
           id?: string
         }
         Relationships: []
+      }
+      reviews: {
+        Row: {
+          body: string | null
+          club_book_id: string
+          created_at: string
+          goodreads_url: string | null
+          id: string
+          rating: number
+          updated_at: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          body?: string | null
+          club_book_id: string
+          created_at?: string
+          goodreads_url?: string | null
+          id?: string
+          rating: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          club_book_id?: string
+          created_at?: string
+          goodreads_url?: string | null
+          id?: string
+          rating?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'reviews_club_book_id_fkey'
+            columns: ['club_book_id']
+            isOneToOne: false
+            referencedRelation: 'club_books'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reviews_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
       round_results: {
         Row: {
@@ -587,11 +692,14 @@ export type Database = {
         }[]
       }
       can_close_round: { Args: { p_round_id: string }; Returns: boolean }
+      can_read_reviews: { Args: { p_club_book_id: string }; Returns: boolean }
       cancel_round: { Args: { p_round_id: string }; Returns: undefined }
       claim_round_close: {
         Args: { p_early?: boolean; p_round_id: string }
         Returns: Json
       }
+      club_book_club: { Args: { p_club_book_id: string }; Returns: string }
+      club_book_summary: { Args: { p_club_book_id: string }; Returns: Json }
       club_role: {
         Args: { p_club_id: string }
         Returns: Database['public']['Enums']['club_role']
@@ -635,6 +743,15 @@ export type Database = {
         }
         Returns: string
       }
+      post_review: {
+        Args: {
+          p_body?: string
+          p_club_book_id: string
+          p_goodreads_url?: string
+          p_rating: number
+        }
+        Returns: string
+      }
       remove_member: {
         Args: { p_club_id: string; p_user_id: string }
         Returns: undefined
@@ -662,6 +779,13 @@ export type Database = {
       save_ballot: {
         Args: { p_nomination_ids: string[]; p_round_id: string }
         Returns: string
+      }
+      set_discussion_mode: {
+        Args: {
+          p_club_book_id: string
+          p_mode: Database['public']['Enums']['discussion_mode']
+        }
+        Returns: undefined
       }
       set_member_role: {
         Args: {

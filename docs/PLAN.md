@@ -42,7 +42,11 @@ Smaller copy and style notes are listed in **§7 Mockup → spec reconciliation*
 - **Closing is two database calls around the TypeScript count**: `claim_round_close` (open → closing) and `finalize_round`, both safe to repeat. A claim older than 5 minutes is retaken on the next cron run.
 - **pg_cron runs every 5 minutes** and calls `close-round` through pg_net, but only when a vote is overdue. The URL and service key come from Vault (`close_round_url`, `close_round_key`). The local seed sets them; production has to set them once (see README).
 - **Ties for last place show their reason** on the results page, e.g. "Knocked out second (tied, but behind in an earlier count)", alongside the spec's "(tied, but on fewer ballots)".
-- **Until phase 4 adds book pages**, the results footer says "Back to club", and club home's "Currently reading" card links to "How book N was picked".
+- **Results now link to the winning book** ("Go to <title>"). Club home's "Currently reading" card has Discussion, "I finished it" / Reviews, progress and the average.
+- **Posts and reviews use RLS and column grants directly**, not RPCs. Users can only write `body` (plus the book and parent on insert). A trigger sets the author and enforces one level of replies, so nobody can post as someone else. Reviews go through `post_review`, which also marks the book finished once every current member has reviewed.
+- **`club_book_summary`** gives every member the average, the count and who has finished. The rating breakdown only appears once the caller's reviews are unlocked (D7).
+- **Discussion refreshes every 20 seconds** while open. Realtime posts stay in phase 6.
+- **The discussion-style control is there for admins**, but "Sections" is disabled and labelled coming soon (D14).
 - **shadcn/ui components were copied from the upstream GitHub source**, because the shadcn registry host is blocked in the build environment. Add new ones the same way, or with `pnpm dlx shadcn add` where it's reachable.
 
 ---
@@ -233,7 +237,7 @@ Each phase ends deployed to preview, with its tests green. Estimates assume one 
 7. Results view (winner card, standings, random copy). Club home open-vote card + "Pick the next book" CTA.
 8. Tests: IRV unit suite; pgTAP for ballot rules; an integration test that seeds a round, calls `close-round` locally twice (idempotency), and asserts one club_book.
 
-### P4: Reading (≈ 1 week)
+### P4: Reading (≈ 1 week) — done
 1. Club book page: header, segmented nav, admin mode control (D14), posts + one-level replies, composer, edit/delete own post (admins can delete any post, for moderation).
 2. Review page: StarInput (with keyboard and screen-reader tests via Testing Library), `post_review` with auto-finish, posted state, Goodreads copy & open (`navigator.clipboard.writeText`, then `window.open(goodreads isbn url)`; fall back to a title search URL when there's no ISBN).
 3. Reviews page: reveal rules (RLS-backed), locked state (D7), distribution, still-reading rows.

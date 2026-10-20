@@ -14,6 +14,7 @@ import {
   SectionLabel,
 } from '#/components/layout'
 import {
+  bookSummaryQuery,
   clubQuery,
   currentBookQuery,
   membersQuery,
@@ -21,7 +22,7 @@ import {
   openRoundQuery,
   voteStatusQuery,
 } from '#/lib/queries'
-import type { Round } from '#/lib/queries'
+import type { ClubBook, Round } from '#/lib/queries'
 import { authorLine } from '#/lib/books'
 import { daysLeftLabel, formatDeadline } from '#/lib/dates'
 
@@ -32,6 +33,11 @@ export const Route = createFileRoute('/_app/c/$clubId/')({
       context.queryClient.ensureQueryData(openRoundQuery(params.clubId)),
       context.queryClient.ensureQueryData(currentBookQuery(params.clubId)),
     ])
+    const current = context.queryClient.getQueryData(
+      currentBookQuery(params.clubId).queryKey,
+    )
+    if (current)
+      await context.queryClient.ensureQueryData(bookSummaryQuery(current.id))
     if (round) {
       await Promise.all([
         context.queryClient.ensureQueryData(nominationsQuery(round.id)),
@@ -96,35 +102,7 @@ function ClubHome() {
         {current && (
           <>
             <SectionLabel className="mt-1.5">Currently reading</SectionLabel>
-            <Panel>
-              <div className="flex items-start gap-3">
-                <BookCover
-                  title={current.book.title}
-                  coverUrl={current.book.cover_url}
-                  idKey={current.book.google_books_id}
-                  width={56}
-                />
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="text-muted-foreground text-[13px]">
-                    Book {current.number}
-                  </span>
-                  <strong className="text-[17px]">{current.book.title}</strong>
-                  <span className="text-muted-foreground text-[13px]">
-                    {authorLine(current.book.authors)}
-                  </span>
-                </div>
-              </div>
-              {current.round_id && (
-                <Button asChild variant="outline">
-                  <Link
-                    to="/c/$clubId/votes/$roundId"
-                    params={{ clubId, roundId: current.round_id }}
-                  >
-                    How book {current.number} was picked
-                  </Link>
-                </Button>
-              )}
-            </Panel>
+            <CurrentBookCard clubId={clubId} book={current} userId={user.id} />
           </>
         )}
 
@@ -253,6 +231,85 @@ function OpenVoteCard({
           </Link>
         </Button>
       </div>
+    </Panel>
+  )
+}
+
+function CurrentBookCard({
+  clubId,
+  book,
+  userId,
+}: {
+  clubId: string
+  book: Omit<ClubBook, 'club_id' | 'discussion_mode' | 'finished_at'>
+  userId: string
+}) {
+  const { data: summary } = useSuspenseQuery(bookSummaryQuery(book.id))
+  const finished = summary.finished_user_ids.includes(userId)
+  return (
+    <Panel>
+      <Link
+        to="/c/$clubId/books/$bookId"
+        params={{ clubId, bookId: book.id }}
+        className="text-foreground hover:text-foreground flex items-start gap-3"
+      >
+        <BookCover
+          title={book.book.title}
+          coverUrl={book.book.cover_url}
+          idKey={book.book.google_books_id}
+          width={56}
+        />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="text-muted-foreground text-[13px]">
+            Book {book.number}
+          </span>
+          <strong className="text-[17px]">{book.book.title}</strong>
+          <span className="text-muted-foreground text-[13px]">
+            {authorLine(book.book.authors)}
+          </span>
+          <span className="text-muted-foreground text-[13px]">
+            {summary.finished_user_ids.length} of {summary.member_count}{' '}
+            finished
+            {summary.average !== null && ` · ★ ${summary.average}`}
+          </span>
+        </div>
+      </Link>
+      <div className="grid grid-cols-2 gap-2">
+        <Button asChild variant="outline">
+          <Link
+            to="/c/$clubId/books/$bookId"
+            params={{ clubId, bookId: book.id }}
+          >
+            Discussion
+          </Link>
+        </Button>
+        <Button asChild variant="outline">
+          {finished ? (
+            <Link
+              to="/c/$clubId/books/$bookId/reviews"
+              params={{ clubId, bookId: book.id }}
+            >
+              Reviews
+            </Link>
+          ) : (
+            <Link
+              to="/c/$clubId/books/$bookId/review"
+              params={{ clubId, bookId: book.id }}
+            >
+              I finished it
+            </Link>
+          )}
+        </Button>
+      </div>
+      {book.round_id && (
+        <Link
+          to="/c/$clubId/votes/$roundId"
+          params={{ clubId, roundId: book.round_id }}
+          className="text-[13px] font-semibold"
+        >
+          How book {book.number} was picked
+        </Link>
+      )}
     </Panel>
   )
 }
