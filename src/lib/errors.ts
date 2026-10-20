@@ -16,6 +16,8 @@ const MESSAGES: Record<string, string> = {
   nomination_limit_reached: 'You’ve used all your picks for this book.',
   already_nominated: 'Someone already nominated that book.',
   picks_cannot_decrease: 'Picks each can’t go down once people have nominated.',
+  anonymity_locked:
+    'Anonymous voting can’t be turned off once people have nominated.',
   search_unavailable:
     'Book search isn’t available right now. Try again in a minute.',
   book_not_found: 'That book couldn’t be found. Try another result.',

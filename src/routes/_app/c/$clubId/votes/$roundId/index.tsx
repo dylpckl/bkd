@@ -73,13 +73,35 @@ function VotePage() {
   const { data: club } = useSuspenseQuery(clubQuery(clubId, user.id))
   const { data: round } = useSuspenseQuery({
     ...roundQuery(roundId),
-    // While votes are being counted, check back until the results land.
-    refetchInterval: (q) => (q.state.data?.status === 'closing' ? 2000 : false),
+    // While votes are being counted, check back until the results land. An open
+    // vote is checked again at its deadline, then every 30s until the next cron
+    // run (every 5 minutes) closes it, so the page never sits on a stale ballot.
+    refetchInterval: (q) => {
+      const r = q.state.data
+      if (r?.status === 'closing') return 2000
+      if (r?.status !== 'open') return false
+      const untilDeadline = new Date(r.deadline).getTime() - Date.now()
+      return untilDeadline > 0
+        ? Math.min(untilDeadline + 1000, 5 * 60_000)
+        : 30_000
+    },
   })
   const { data: nominations } = useSuspenseQuery(nominationsQuery(roundId))
   const { data: members } = useSuspenseQuery(membersQuery(clubId))
   const [viewing, setViewing] = useState<Nomination | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('idle')
+  // Re-render at the deadline so the ballot locks without a refresh.
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (round?.status !== 'open') return
+    const ms = new Date(round.deadline).getTime() - Date.now()
+    if (ms <= 0) return
+    const t = setTimeout(
+      () => setTick((n) => n + 1),
+      Math.min(ms + 500, 2 ** 31 - 1),
+    )
+    return () => clearTimeout(t)
+  }, [round?.status, round?.deadline])
   if (!round || !club) return null
 
   const byId = new Map(members.map((m) => [m.userId, m]))

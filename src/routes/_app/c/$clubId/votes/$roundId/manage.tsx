@@ -123,6 +123,8 @@ function ManageVotePage() {
     .map((s) => byId.get(s.user_id))
     .filter((m) => !!m)
   const minPicks = nominations.length > 0 ? round.max_nominations_per_member : 1
+  // Turning it off would name people who nominated expecting to stay hidden.
+  const anonymityLocked = round.anonymous_nominators && nominations.length > 0
   const dirty =
     date !== initialDate ||
     picks !== round.max_nominations_per_member ||
@@ -261,12 +263,15 @@ function ManageVotePage() {
               <span className="flex flex-col">
                 <strong className="text-sm">Anonymous voting</strong>
                 <span className="text-muted-foreground text-[13px]">
-                  Hide who nominated each book until voting closes
+                  {anonymityLocked
+                    ? 'Stays on now that people have nominated'
+                    : 'Hide who nominated each book until voting closes'}
                 </span>
               </span>
               <Switch
                 checked={anonymous}
                 onCheckedChange={setAnonymous}
+                disabled={anonymityLocked}
                 aria-label="Anonymous voting"
               />
             </label>
