@@ -720,6 +720,10 @@ export type Database = {
         Args: { p_result: Json; p_round_id: string }
         Returns: string
       }
+      finish_if_all_reviewed: {
+        Args: { p_club_id: string }
+        Returns: undefined
+      }
       invite_preview: { Args: { p_token: string }; Returns: Json }
       invite_status: {
         Args: {

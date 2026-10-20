@@ -16,6 +16,7 @@ const MESSAGES: Record<string, string> = {
   nomination_limit_reached: 'You’ve used all your picks for this book.',
   already_nominated: 'Someone already nominated that book.',
   picks_cannot_decrease: 'Picks each can’t go down once people have nominated.',
+  invalid_reply: 'That post was deleted, so your reply wasn’t sent.',
   anonymity_locked:
     'Anonymous voting can’t be turned off once people have nominated.',
   search_unavailable:

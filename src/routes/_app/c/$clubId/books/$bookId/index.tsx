@@ -243,7 +243,13 @@ function PostCard({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {mine && (
-                <DropdownMenuItem onSelect={() => setEditing(true)}>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    // Start from the latest text, which may have changed since mount.
+                    setDraft(post.body)
+                    setEditing(true)
+                  }}
+                >
                   Edit
                 </DropdownMenuItem>
               )}
@@ -372,7 +378,16 @@ function Composer({
         queryKey: ['club-book', bookId, 'posts'],
       })
     },
-    onError: (e) => toast.error(errorMessage(e, "Couldn't post. Try again.")),
+    onError: (e) => {
+      toast.error(errorMessage(e, "Couldn't post. Try again."))
+      if ((e as { message?: string }).message === 'invalid_reply') {
+        // The post being replied to was deleted; drop it and show the thread as it is.
+        onClearReply()
+        void queryClient.invalidateQueries({
+          queryKey: ['club-book', bookId, 'posts'],
+        })
+      }
+    },
   })
 
   return (

@@ -28,7 +28,8 @@ import { errorMessage, must } from '#/lib/errors'
 
 export const Route = createFileRoute('/_app/c/$clubId/books/$bookId/review')({
   loader: ({ context, params }) =>
-    context.queryClient.ensureQueryData(reviewsQuery(params.bookId)),
+    // Fresh, so a review posted on another device opens as an edit.
+    context.queryClient.fetchQuery(reviewsQuery(params.bookId)),
   head: () => ({ meta: [{ title: 'Your review' }] }),
   component: ReviewPage,
 })

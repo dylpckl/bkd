@@ -1,7 +1,7 @@
 -- Posts, reviews, reveal rules and finishing.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(25);
+select plan(29);
 
 insert into auth.users (id, email, raw_user_meta_data, aud, role) values
   ('00000000-0000-0000-0000-0000000000c1', 'r-admin@test.dev', '{"display_name":"Rae"}', 'authenticated', 'authenticated'),
@@ -74,6 +74,24 @@ select is((select status::text from public.club_books where id = (select cb from
 select is((public.club_book_summary((select cb from t)) ->> 'average')::numeric, 3.8, 'average is to one decimal (7.5 half-stars = 3.75 → 3.8)');
 select lives_ok($$ select public.post_review((select cb from t), 7) $$, 'reviews can be edited');
 select is((select rating from public.reviews where user_id = auth.uid()), 7::smallint, 'edit updated the rating');
+
+-- Leaving: a former member's review doesn't count as finished, and the book
+-- finishes when the last member still reading leaves.
+select pg_temp.as_postgres();
+insert into public.club_members (club_id, user_id) select club_id, '00000000-0000-0000-0000-0000000000c3' from t;
+insert into public.club_books (club_id, book_id, number) select club_id, '40000000-0000-0000-0000-000000000001', 2 from t;
+update t set cb = (select id from public.club_books where club_id = t.club_id and number = 2);
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000c2');
+select lives_ok($$ select public.post_review((select cb from t), 8) $$, 'Sam reviews book 2');
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000c1');
+select lives_ok($$ select public.post_review((select cb from t), 8) $$, 'Rae reviews book 2; Tess is still reading');
+select pg_temp.as_postgres();
+delete from public.club_members where user_id = '00000000-0000-0000-0000-0000000000c2';
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000c1');
+select is(jsonb_array_length(public.club_book_summary((select cb from t)) -> 'finished_user_ids'), 1, 'Sam left, so only Rae counts as finished');
+select pg_temp.as_postgres();
+delete from public.club_members where user_id = '00000000-0000-0000-0000-0000000000c3';
+select is((select status::text from public.club_books where id = (select cb from t)), 'finished', 'Tess left, so everyone left has finished');
 
 select * from finish();
 rollback;

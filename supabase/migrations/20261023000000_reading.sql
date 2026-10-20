@@ -123,6 +123,21 @@ create policy "reviews: own, or unlocked" on public.reviews
   for select to authenticated
   using (user_id = (select auth.uid()) or coalesce(public.can_read_reviews(club_book_id), false));
 
+-- Everyone who's in the club now has reviewed the book being read: it's done.
+create function public.finish_if_all_reviewed(p_club_id uuid)
+returns void
+language sql security definer set search_path = ''
+as $$
+  update public.club_books cb set status = 'finished', finished_at = now()
+  where cb.club_id = p_club_id and cb.status = 'reading'
+    and exists (select 1 from public.club_members m where m.club_id = cb.club_id)
+    and not exists (
+      select 1 from public.club_members m
+      where m.club_id = cb.club_id
+        and not exists (select 1 from public.reviews r where r.club_book_id = cb.id and r.user_id = m.user_id)
+    )
+$$;
+
 create function public.post_review(
   p_club_book_id uuid,
   p_rating int,
@@ -153,18 +168,25 @@ begin
     updated_at = now()
   returning id into v_id;
 
-  -- Everyone who's in the club now has finished: the book is done.
-  update public.club_books cb set status = 'finished', finished_at = now()
-  where cb.id = p_club_book_id and cb.status = 'reading'
-    and not exists (
-      select 1 from public.club_members m
-      where m.club_id = cb.club_id
-        and not exists (select 1 from public.reviews r where r.club_book_id = cb.id and r.user_id = m.user_id)
-    );
-
+  perform public.finish_if_all_reviewed(v_club);
   return v_id;
 end;
 $$;
+
+-- When the last member still reading leaves, everyone left has finished.
+create function public.on_member_left()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  perform public.finish_if_all_reviewed(old.club_id);
+  return null;
+end;
+$$;
+
+create trigger club_members_finish_books
+  after delete on public.club_members
+  for each row execute function public.on_member_left();
 
 -- What every member may see about a book's reviews, even before finishing:
 -- the average, the count, and who has finished. The rating breakdown only
@@ -177,8 +199,12 @@ as $$
     'average', (select round(avg(r.rating) / 2.0, 1) from public.reviews r where r.club_book_id = cb.id),
     'review_count', (select count(*) from public.reviews r where r.club_book_id = cb.id),
     'member_count', (select count(*) from public.club_members m where m.club_id = cb.club_id),
+    -- Current members only, so "4 of 6 finished" adds up after people leave.
     'finished_user_ids', coalesce((
-      select jsonb_agg(r.user_id order by r.created_at) from public.reviews r where r.club_book_id = cb.id
+      select jsonb_agg(r.user_id order by r.created_at)
+      from public.reviews r
+      join public.club_members m on m.club_id = cb.club_id and m.user_id = r.user_id
+      where r.club_book_id = cb.id
     ), '[]'::jsonb),
     'unlocked', coalesce(public.can_read_reviews(cb.id), false),
     'distribution', case when coalesce(public.can_read_reviews(cb.id), false) then coalesce((
@@ -204,11 +230,13 @@ $$;
 revoke execute on function
   public.club_book_club(uuid),
   public.check_post(),
+  public.finish_if_all_reviewed(uuid),
+  public.on_member_left(),
   public.can_read_reviews(uuid),
   public.post_review(uuid, int, text, text),
   public.club_book_summary(uuid),
   public.set_discussion_mode(uuid, public.discussion_mode)
-from public, anon;
+from public, anon, authenticated;
 
 grant execute on function
   public.club_book_club(uuid),
