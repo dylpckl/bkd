@@ -71,15 +71,14 @@ language plpgsql security definer set search_path = ''
 as $$
 declare
   v_uid uuid := (select auth.uid());
-  v_club uuid;
+  v_round public.rounds;
   v_first timestamptz;
 begin
-  select club_id into v_club from public.rounds where id = p_round_id;
-  if v_club is null or not public.is_club_member(v_club) then raise exception 'not_allowed'; end if;
-  if (select status from public.rounds where id = p_round_id) <> 'open'
-     or (select deadline from public.rounds where id = p_round_id) <= now() then
-    raise exception 'round_not_open';
-  end if;
+  -- FOR SHARE waits out a close that's claiming the round right now, so a save
+  -- either lands before the votes are read or fails; it can't be silently left out.
+  select * into v_round from public.rounds where id = p_round_id for share;
+  if v_round.id is null or not public.is_club_member(v_round.club_id) then raise exception 'not_allowed'; end if;
+  if v_round.status <> 'open' or v_round.deadline <= now() then raise exception 'round_not_open'; end if;
 
   insert into public.ballots (round_id, user_id) values (p_round_id, v_uid)
   on conflict (round_id, user_id) do update set updated_at = now()
@@ -133,6 +132,11 @@ begin
   select * into v_round from public.rounds where id = p_round_id for update;
   if v_round.id is null or not public.is_club_admin(v_round.club_id) then raise exception 'not_allowed'; end if;
   if v_round.status <> 'open' then raise exception 'round_not_open'; end if;
+  -- People nominated expecting to stay anonymous until the vote closes.
+  if v_round.anonymous_nominators and p_anonymous is false
+     and exists (select 1 from public.nominations where round_id = p_round_id) then
+    raise exception 'anonymity_locked';
+  end if;
 
   v_tz := coalesce(p_timezone, v_round.timezone);
   if not exists (select 1 from pg_catalog.pg_timezone_names where name = v_tz) then

@@ -1,7 +1,7 @@
 -- Ballots, managing a vote, closing and results.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(30);
+select plan(31);
 
 insert into auth.users (id, email, raw_user_meta_data, aud, role) values
   ('00000000-0000-0000-0000-0000000000b1', 'v-admin@test.dev', '{"display_name":"Ava"}', 'authenticated', 'authenticated'),
@@ -72,6 +72,7 @@ select pg_temp.as_user('00000000-0000-0000-0000-0000000000b1');
 select lives_ok($$ select public.update_round((select round_id from t), current_date + 5, null, 3, true) $$, 'admin moves the deadline and raises picks');
 select is((select max_nominations_per_member from public.rounds where id = (select round_id from t)), 3, 'picks raised');
 select throws_ok($$ select public.update_round((select round_id from t), null, null, 1) $$, 'picks_cannot_decrease', 'picks cannot go back down');
+select throws_ok($$ select public.update_round((select round_id from t), null, null, null, false) $$, 'anonymity_locked', 'anonymity stays on once people have nominated');
 select throws_ok($$ select public.update_round((select round_id from t), current_date - 1) $$, 'deadline_in_past', 'deadline stays in the future');
 
 -- Service-only functions are off limits to users.

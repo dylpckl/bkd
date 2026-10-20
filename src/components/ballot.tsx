@@ -97,14 +97,32 @@ export function useBallot(
     onError: () => setSaveState('error'),
   })
 
+  // The order waiting out the debounce, so leaving the page can still save it.
+  const pending = useRef<string[] | null>(null)
   const commit = (next: string[]) => {
     setOrder(next)
     setVoted(true)
     setSaveState('saving')
     clearTimeout(timer.current)
-    timer.current = setTimeout(() => save.mutate(next), 600)
+    pending.current = next
+    timer.current = setTimeout(() => {
+      pending.current = null
+      save.mutate(next)
+    }, 600)
   }
-  useEffect(() => () => clearTimeout(timer.current), [])
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current)
+      if (!pending.current) return
+      const ids = pending.current
+      void getSupabaseBrowserClient()
+        .rpc('save_ballot', { p_round_id: roundId, p_nomination_ids: ids })
+        .then(() =>
+          queryClient.invalidateQueries({ queryKey: ['round', roundId] }),
+        )
+    },
+    [roundId, queryClient],
+  )
 
   const firstCastAt = ballot?.firstCastAt ?? null
   const isNew = (n: Nomination) =>
