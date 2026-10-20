@@ -48,6 +48,8 @@ export const myClubsQuery = (userId: string) =>
             'role, joined_at, club:clubs!inner(id, name, description, created_at, members:club_members(count), rounds(id, number, status, deadline, timezone))',
           )
           .eq('user_id', userId)
+          // Only the open round is needed, not the club's whole history.
+          .in('club.rounds.status', ['open', 'closing'])
           .order('joined_at', { ascending: false }),
       )
       return rows.map((r) => ({

@@ -20,7 +20,12 @@ async function call<T>(
     },
   })
   const text = await res.text()
-  const body = text ? JSON.parse(text) : null
+  let body: { message?: string; code?: string } | null = null
+  try {
+    body = text ? JSON.parse(text) : null
+  } catch {
+    // Gateways can answer with HTML (e.g. a 502 page); fall back to the status text.
+  }
   if (!res.ok)
     return {
       data: null,

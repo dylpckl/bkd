@@ -31,6 +31,7 @@ type Volume = {
   }
 }
 
+// Named entities Google Books descriptions actually use; numeric ones are decoded generally.
 const ENTITIES: Record<string, string> = {
   amp: '&',
   lt: '<',
@@ -38,7 +39,35 @@ const ENTITIES: Record<string, string> = {
   quot: '"',
   apos: "'",
   nbsp: ' ',
-  '#39': "'",
+  mdash: '—',
+  ndash: '–',
+  hellip: '…',
+  lsquo: '‘',
+  rsquo: '’',
+  ldquo: '“',
+  rdquo: '”',
+  laquo: '«',
+  raquo: '»',
+  eacute: 'é',
+  egrave: 'è',
+  copy: '©',
+}
+
+function decodeEntity(match: string, name: string): string {
+  const code =
+    name[0] !== '#'
+      ? NaN
+      : name[1] === 'x' || name[1] === 'X'
+        ? parseInt(name.slice(2), 16)
+        : parseInt(name.slice(1), 10)
+  if (!Number.isNaN(code)) {
+    try {
+      return String.fromCodePoint(code)
+    } catch {
+      return match
+    }
+  }
+  return ENTITIES[name] ?? match
 }
 
 export function stripHtml(html: string): string {
@@ -46,7 +75,7 @@ export function stripHtml(html: string): string {
     .replace(/<\s*br\s*\/?>/gi, '\n')
     .replace(/<\/p>\s*/gi, '\n\n')
     .replace(/<[^>]+>/g, '')
-    .replace(/&(#?\w+);/g, (m, name: string) => ENTITIES[name] ?? m)
+    .replace(/&(#?\w+);/g, decodeEntity)
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()

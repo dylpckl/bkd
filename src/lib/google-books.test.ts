@@ -71,6 +71,12 @@ describe('helpers', () => {
   it('strips tags and decodes entities', () => {
     expect(stripHtml('A<br>B &quot;C&quot; &#39;D&#39;')).toBe('A\nB "C" \'D\'')
   })
+  it('decodes numeric and common named entities', () => {
+    expect(
+      stripHtml('Don&#8217;t &mdash; really &#x2014; ok&hellip; &bogus;'),
+    ).toBe('Don’t — really — ok… &bogus;')
+    expect(stripHtml('&#99999999;')).toBe('&#99999999;')
+  })
   it('returns null for a missing cover', () => {
     expect(cleanCoverUrl(undefined)).toBeNull()
   })
