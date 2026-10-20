@@ -23,6 +23,8 @@ export default [
       'src/lib/supabase/database.types.ts',
       // Vendored shadcn/ui sources, kept as upstream wrote them.
       'src/components/ui/**',
+      // Deno code; type-checked by the edge runtime, not this tsconfig.
+      'supabase/functions/**',
     ],
   },
 ]

@@ -11,6 +11,7 @@ import {
   SectionLabel,
 } from '#/components/layout'
 import { avatarSrc, myClubsQuery, profileQuery } from '#/lib/queries'
+import { closesShort } from '#/lib/dates'
 
 const ROLE_LABEL = { owner: 'Owner', admin: 'Admin', member: 'Member' } as const
 
@@ -74,7 +75,17 @@ function ClubsPage() {
                         {club.memberCount === 1 ? 'member' : 'members'} ·{' '}
                         {ROLE_LABEL[club.role]}
                       </span>
-                      <Chip>Between books</Chip>
+                      {club.openRound ? (
+                        <Chip tone="amber">
+                          Voting ·{' '}
+                          {closesShort(
+                            club.openRound.deadline,
+                            club.openRound.timezone,
+                          )}
+                        </Chip>
+                      ) : (
+                        <Chip>Between books</Chip>
+                      )}
                     </span>
                     <ChevronRight
                       className="mt-3.5 size-5 text-stone-500"

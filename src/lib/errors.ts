@@ -7,6 +7,17 @@ const MESSAGES: Record<string, string> = {
   use_leave_club: 'Use "Leave club" to remove yourself.',
   already_owner: "You're already the owner.",
   invalid_expiry: 'Pick an expiry date in the future.',
+  round_not_open: 'Voting for this book has closed.',
+  round_already_open: 'There’s already a vote open in this club.',
+  deadline_in_past: 'Pick a closing date that hasn’t passed yet.',
+  invalid_timezone:
+    'Your device’s timezone wasn’t recognized. Try another browser.',
+  nomination_limit_reached: 'You’ve used all your picks for this book.',
+  already_nominated: 'Someone already nominated that book.',
+  picks_cannot_decrease: 'Picks each can’t go down once people have nominated.',
+  search_unavailable:
+    'Book search isn’t available right now. Try again in a minute.',
+  book_not_found: 'That book couldn’t be found. Try another result.',
 }
 
 /** Turns a Supabase/RPC error into copy for a toast or inline message. */
@@ -26,4 +37,29 @@ export async function must<T>(
   const { data, error } = await request
   if (error) throw error
   return data
+}
+
+/** Calls an edge function and throws `{ message: <error code> }` on failure. */
+export async function invokeFunction<T>(
+  name: string,
+  body: Record<string, unknown>,
+): Promise<T> {
+  const { getSupabaseBrowserClient } = await import('./supabase/browser')
+  const { data, error } = await getSupabaseBrowserClient().functions.invoke<T>(
+    name,
+    { body },
+  )
+  if (error) {
+    let code = 'server_error'
+    try {
+      const context = (error as { context?: Response }).context
+      code =
+        ((await context?.json()) as { error?: string } | undefined)?.error ??
+        code
+    } catch {
+      // Not JSON (network failure, boot error): keep the generic code.
+    }
+    throw { message: code }
+  }
+  return data as T
 }
