@@ -18,7 +18,9 @@ import { starsLabel } from '#/lib/goodreads'
 export const Route = createFileRoute('/_app/c/$clubId/books/$bookId/reviews')({
   loader: ({ context, params }) =>
     Promise.all([
-      context.queryClient.ensureQueryData(reviewsQuery(params.bookId)),
+      // Both change as members finish, so switching tabs fetches them fresh.
+      context.queryClient.fetchQuery(bookSummaryQuery(params.bookId)),
+      context.queryClient.fetchQuery(reviewsQuery(params.bookId)),
       context.queryClient.ensureQueryData(membersQuery(params.clubId)),
     ]),
   component: ReviewsPage,

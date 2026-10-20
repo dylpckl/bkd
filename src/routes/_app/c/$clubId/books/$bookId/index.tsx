@@ -35,7 +35,7 @@ import { cn } from '#/lib/utils'
 export const Route = createFileRoute('/_app/c/$clubId/books/$bookId/')({
   loader: ({ context, params }) =>
     Promise.all([
-      context.queryClient.ensureQueryData(postsQuery(params.bookId)),
+      context.queryClient.fetchQuery(postsQuery(params.bookId)),
       context.queryClient.ensureQueryData(membersQuery(params.clubId)),
     ]),
   component: DiscussionPage,

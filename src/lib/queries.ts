@@ -361,7 +361,8 @@ export type BookSummary = {
 export const bookSummaryQuery = (bookId: string) =>
   queryOptions({
     queryKey: ['club-book', bookId, 'summary'],
-    // Changes as other members post and finish; always refresh on view.
+    // Changes as other members post and finish. Loaders use fetchQuery, so this
+    // means every visit gets fresh data (suspense raises staleTime to 1s otherwise).
     staleTime: 0,
     queryFn: async () =>
       unwrap(
@@ -374,7 +375,8 @@ export const bookSummaryQuery = (bookId: string) =>
 export const postsQuery = (bookId: string) =>
   queryOptions({
     queryKey: ['club-book', bookId, 'posts'],
-    // Changes as other members post and finish; always refresh on view.
+    // Changes as other members post and finish. Loaders use fetchQuery, so this
+    // means every visit gets fresh data (suspense raises staleTime to 1s otherwise).
     staleTime: 0,
     queryFn: async () =>
       unwrap(
@@ -393,7 +395,8 @@ export type Post = Awaited<
 export const reviewsQuery = (bookId: string) =>
   queryOptions({
     queryKey: ['club-book', bookId, 'reviews'],
-    // Changes as other members post and finish; always refresh on view.
+    // Changes as other members post and finish. Loaders use fetchQuery, so this
+    // means every visit gets fresh data (suspense raises staleTime to 1s otherwise).
     staleTime: 0,
     queryFn: async () =>
       unwrap(
