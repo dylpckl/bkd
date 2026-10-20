@@ -30,10 +30,20 @@ export const getAuthUser = createIsomorphicFn()
     return toAuthUser(data.session?.user)
   })
 
-/** Only same-origin relative paths are allowed as a post-login destination. */
+const PROBE_ORIGIN = 'http://next.invalid'
+
+/**
+ * Only same-origin paths are allowed as a post-login destination. The path is
+ * resolved the way a browser would (which strips tabs and newlines and treats
+ * backslashes as slashes) and rejected if it would leave this origin.
+ */
 export function safeNext(next: unknown, fallback = '/clubs'): string {
-  if (typeof next !== 'string') return fallback
-  if (!next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\'))
+  if (typeof next !== 'string' || !next.startsWith('/')) return fallback
+  try {
+    const url = new URL(next, PROBE_ORIGIN)
+    if (url.origin !== PROBE_ORIGIN) return fallback
+    return url.pathname + url.search + url.hash
+  } catch {
     return fallback
-  return next
+  }
 }

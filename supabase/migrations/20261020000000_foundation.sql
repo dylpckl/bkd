@@ -215,6 +215,7 @@ declare
 begin
   if not public.is_club_admin(p_club_id) then raise exception 'not_allowed'; end if;
   if p_expires_at is not null and p_expires_at <= now() then raise exception 'invalid_expiry'; end if;
+  if p_max_uses is not null and p_max_uses not between 1 and 500 then raise exception 'invalid_max_uses'; end if;
 
   -- Settings shows one link at a time, so a new link replaces the old ones.
   update public.club_invites set revoked_at = now()
@@ -262,6 +263,7 @@ as $$
 declare
   v_invite public.club_invites;
   v_status text;
+  v_is_member boolean;
   v_uid uuid := (select auth.uid());
 begin
   select * into v_invite from public.club_invites where token = p_token;
@@ -270,11 +272,18 @@ begin
     return jsonb_build_object('status', 'invalid');
   end if;
 
+  v_is_member := v_uid is not null and exists (
+    select 1 from public.club_members where club_id = v_invite.club_id and user_id = v_uid
+  );
+  -- A revoked, expired or used-up link reveals nothing about the club, except to
+  -- people already in it (so they can still be sent to the club).
+  if v_status <> 'valid' and not v_is_member then
+    return jsonb_build_object('status', v_status, 'is_member', false);
+  end if;
+
   return jsonb_build_object(
     'status', v_status,
-    'is_member', v_uid is not null and exists (
-      select 1 from public.club_members where club_id = v_invite.club_id and user_id = v_uid
-    ),
+    'is_member', v_is_member,
     'club', (
       select jsonb_build_object(
         'id', c.id,
@@ -434,6 +443,9 @@ grant execute on function
   public.delete_club(uuid)
 to authenticated;
 grant execute on function public.invite_preview(text) to anon, authenticated;
+-- Lets club settings select `status:invite_status` on its invite, so the app shows
+-- the same verdict accept_invite enforces (and uses the database clock).
+grant execute on function public.invite_status(public.club_invites) to authenticated;
 alter default privileges in schema public revoke execute on functions from public, anon;
 
 -- ---------------------------------------------------------------------------

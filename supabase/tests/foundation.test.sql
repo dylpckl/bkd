@@ -1,7 +1,7 @@
 -- RLS and RPC rules for clubs, membership and invites. Run with `supabase test db`.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(41);
+select plan(47);
 
 -- Test users: owner, admin, member, outsider.
 insert into auth.users (id, email, raw_user_meta_data, aud, role)
@@ -91,6 +91,16 @@ update t set new_token = public.create_invite(club_id, now() + interval '1 day',
 select isnt((select new_token from t), (select token from t), 'admin makes a new link');
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000d');
 select is((select status from public.accept_invite((select token from t))), 'revoked', 'old link is revoked');
+select is(public.invite_preview((select token from t)) - 'is_member', '{"status":"revoked"}'::jsonb,
+  'a revoked link reveals nothing but its status');
+select pg_temp.as_anon();
+select is(public.invite_preview((select token from t)) -> 'club', null, 'not to anonymous visitors either');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select is(public.invite_preview((select token from t)) -> 'club' ->> 'name', 'The Overdue Society', 'members still get the club from a dead link');
+select throws_ok($$ select public.create_invite((select club_id from t), null, 0) $$, 'invalid_max_uses', 'max people of 0 is rejected');
+select throws_ok($$ select public.create_invite((select club_id from t), null, 501) $$, 'invalid_max_uses', 'max people over 500 is rejected');
+select is((select public.invite_status(i) from public.club_invites i where token = (select token from t)), 'revoked',
+  'admins can read invite status from the database');
 
 -- Expired and used-up links.
 select pg_temp.as_postgres();
