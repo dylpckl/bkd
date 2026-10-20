@@ -13,7 +13,8 @@ import {
 } from '#/components/layout'
 import { getSupabaseBrowserClient } from '#/lib/supabase/browser'
 import { initials } from '#/lib/initials'
-import { errorMessage } from '#/lib/errors'
+import { errorMessage, must } from '#/lib/errors'
+import { CLUB_DESCRIPTION_MAX, CLUB_NAME_MAX } from '#/lib/limits'
 
 export const Route = createFileRoute('/_app/clubs/new')({
   head: () => ({ meta: [{ title: 'New club' }] }),
@@ -28,15 +29,15 @@ function NewClubPage() {
 
   const create = useMutation({
     mutationFn: async () => {
-      const { data, error } = await getSupabaseBrowserClient().rpc(
-        'create_club',
-        {
+      const rows = await must(
+        getSupabaseBrowserClient().rpc('create_club', {
           p_name: name.trim(),
           p_description: description.trim() || undefined,
-        },
+        }),
       )
-      if (error) throw error
-      return data[0]
+      const created = rows?.[0]
+      if (!created) throw { message: 'not_allowed' }
+      return created
     },
     onSuccess: async ({ club_id }) => {
       await queryClient.invalidateQueries({ queryKey: ['clubs'] })
@@ -65,7 +66,7 @@ function NewClubPage() {
             <Input
               id="name"
               required
-              maxLength={40}
+              maxLength={CLUB_NAME_MAX}
               placeholder="e.g. The Overdue Society"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -80,7 +81,7 @@ function NewClubPage() {
             </Label>
             <Input
               id="desc"
-              maxLength={60}
+              maxLength={CLUB_DESCRIPTION_MAX}
               placeholder="A line about your club"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -145,7 +146,7 @@ function Shelf({ name, description }: { name: string; description: string }) {
               {name || 'Your club name'}
             </div>
             {description && (
-              <div className="text-[10px] leading-snug font-medium text-[#D6E7DC] italic">
+              <div className="line-clamp-3 text-[10px] leading-snug font-medium text-[#D6E7DC] italic">
                 {description}
               </div>
             )}

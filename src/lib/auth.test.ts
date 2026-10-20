@@ -11,6 +11,10 @@ describe('safeNext', () => {
       'https://evil.test',
       '//evil.test',
       '/\\evil.test',
+      '/\t/evil.test',
+      '/\n/evil.test',
+      '/\r\n/evil.test',
+      '\\/evil.test',
       'javascript:alert(1)',
       '',
       undefined,
@@ -18,5 +22,8 @@ describe('safeNext', () => {
     ]) {
       expect(safeNext(bad)).toBe('/clubs')
     }
+  })
+  it('keeps encoded characters inside the path', () => {
+    expect(safeNext('/%09/evil.test')).toBe('/%09/evil.test')
   })
 })
