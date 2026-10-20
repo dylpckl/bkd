@@ -15,6 +15,7 @@ import {
 } from '#/components/layout'
 import {
   bookSummaryQuery,
+  clubHistoryQuery,
   clubQuery,
   currentBookQuery,
   membersQuery,
@@ -22,9 +23,10 @@ import {
   openRoundQuery,
   voteStatusQuery,
 } from '#/lib/queries'
-import type { ClubBook, Round } from '#/lib/queries'
+import type { ClubBook, HistoryBook, Round } from '#/lib/queries'
 import { authorLine } from '#/lib/books'
 import { daysLeftLabel, formatDeadline } from '#/lib/dates'
+import { formatRating, readingMonths } from '#/lib/history'
 
 export const Route = createFileRoute('/_app/c/$clubId/')({
   loader: async ({ context, params }) => {
@@ -32,6 +34,7 @@ export const Route = createFileRoute('/_app/c/$clubId/')({
       context.queryClient.ensureQueryData(membersQuery(params.clubId)),
       context.queryClient.ensureQueryData(openRoundQuery(params.clubId)),
       context.queryClient.ensureQueryData(currentBookQuery(params.clubId)),
+      context.queryClient.ensureQueryData(clubHistoryQuery(params.clubId)),
     ])
     const current = context.queryClient.getQueryData(
       currentBookQuery(params.clubId).queryKey,
@@ -55,7 +58,9 @@ function ClubHome() {
   const { data: members } = useSuspenseQuery(membersQuery(clubId))
   const { data: round } = useSuspenseQuery(openRoundQuery(clubId))
   const { data: current } = useSuspenseQuery(currentBookQuery(clubId))
+  const { data: history } = useSuspenseQuery(clubHistoryQuery(clubId))
   if (!club) return null
+  const past = history.filter((b) => b.status === 'finished')
 
   return (
     <Screen>
@@ -105,6 +110,8 @@ function ClubHome() {
             <CurrentBookCard clubId={clubId} book={current} userId={user.id} />
           </>
         )}
+
+        {past.length > 0 && <PastBooks clubId={clubId} books={past} />}
 
         <SectionLabel className="mt-1.5">
           Members ({members.length})
@@ -270,7 +277,8 @@ function CurrentBookCard({
           <span className="text-muted-foreground text-[13px]">
             {summary.finished_user_ids.length} of {summary.member_count}{' '}
             finished
-            {summary.average !== null && ` · ★ ${summary.average}`}
+            {summary.average !== null &&
+              ` · ★ ${formatRating(summary.average)}`}
           </span>
         </div>
       </Link>
@@ -311,5 +319,59 @@ function CurrentBookCard({
         </Link>
       )}
     </Panel>
+  )
+}
+
+function PastBooks({
+  clubId,
+  books,
+}: {
+  clubId: string
+  books: HistoryBook[]
+}) {
+  return (
+    <section aria-labelledby="past-books" className="flex flex-col">
+      <div className="mt-1.5 flex items-center justify-between">
+        <SectionLabel id="past-books">Books we’ve read</SectionLabel>
+        <Link
+          to="/c/$clubId/books"
+          params={{ clubId }}
+          className="inline-flex min-h-11 items-center text-[13px] font-semibold"
+        >
+          See all {books.length}
+        </Link>
+      </div>
+      <ul className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1.5">
+        {books.slice(0, 10).map((b) => (
+          <li key={b.id} className="w-[108px] shrink-0 snap-start">
+            <Link
+              to="/c/$clubId/books/$bookId/reviews"
+              params={{ clubId, bookId: b.id }}
+              className="text-foreground hover:text-foreground flex flex-col gap-1"
+            >
+              <BookCover
+                title={b.title}
+                coverUrl={b.cover_url}
+                idKey={b.google_books_id}
+                width={108}
+              />
+              <strong className="mt-0.5 line-clamp-2 text-[13px] leading-tight">
+                {b.title}
+              </strong>
+              {b.average !== null && (
+                <span className="text-warning-foreground text-[13px] font-bold">
+                  <span aria-hidden>★</span>
+                  <span className="sr-only">Club average</span>{' '}
+                  {formatRating(b.average)}
+                </span>
+              )}
+              <span className="text-muted-foreground text-xs">
+                {readingMonths(b)}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }

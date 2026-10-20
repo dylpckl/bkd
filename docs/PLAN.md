@@ -47,6 +47,11 @@ Smaller copy and style notes are listed in **§7 Mockup → spec reconciliation*
 - **`club_book_summary`** gives every member the average, the count and who has finished. The rating breakdown only appears once the caller's reviews are unlocked (D7).
 - **Discussion refreshes every 20 seconds** while open. Realtime posts stay in phase 6.
 - **The discussion-style control is there for admins**, but "Sections" is disabled and labelled coming soon (D14).
+- **History, Needs you and profile stats are three read-only RPCs** (`club_history`, `needs_you`, `profile_stats`). "Books read" on Profile counts books you reviewed, plus books your club finished while you were a member.
+- **"How it was picked"** reads `round_results`: "Picked from 5 · won outright", "Picked from 4 · after 3 counts", "Picked at random from 3", "The only nomination". Books added without a vote (the seed) show no line.
+- **The "12 new posts" chip** on the Currently reading card is left out until there's read tracking (P6, with realtime).
+- **Accessibility is checked with axe** (WCAG 2.1 A/AA) on the main screens in e2e, in place of a Lighthouse run, which isn't available in CI.
+- **Slow loads show a skeleton, failed loads show "Something went wrong · Try again"**, as router defaults, so every screen has both.
 - **shadcn/ui components were copied from the upstream GitHub source**, because the shadcn registry host is blocked in the build environment. Add new ones the same way, or with `pnpm dlx shadcn add` where it's reachable.
 
 ---
@@ -244,7 +249,7 @@ Each phase ends deployed to preview, with its tests green. Estimates assume one 
 4. Average rating to one decimal in a `club_book_stats` view (avg rating/2, count, finished/total).
 5. pgTAP: review visibility before and after your own review, after the book is finished; auto-finish trigger.
 
-### P5: Books read and shell (≈ 4 days)
+### P5: Books read and shell (≈ 4 days) — done
 1. Club home carousel (scroll-snap) + "See all".
 2. `/c/$clubId/books` with "how it was picked" derived from `round_results` (`Picked from N · won outright` / `after K counts` / `picked at random`).
 3. Needs you on `/clubs`: one `needs_you()` RPC that returns typed items across clubs.

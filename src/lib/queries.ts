@@ -441,3 +441,83 @@ export const roundClubBookQuery = (roundId: string) =>
           .maybeSingle(),
       ),
   })
+
+// Generated types call numeric RPC columns `number`, but avg() over no rows is null.
+function nullableNumber(v: unknown): number | null {
+  return v === null || v === undefined ? null : Number(v)
+}
+
+/** Every book the club has read or is reading, newest first (History, club home carousel). */
+export const clubHistoryQuery = (clubId: string) =>
+  queryOptions({
+    queryKey: ['club', clubId, 'history'],
+    queryFn: async () =>
+      unwrap(
+        await getSupabase().rpc('club_history', { p_club_id: clubId }),
+      ).map((b) => ({ ...b, average: nullableNumber(b.average) })),
+  })
+
+export type HistoryBook = Awaited<
+  ReturnType<NonNullable<ReturnType<typeof clubHistoryQuery>['queryFn']>>
+>[number]
+
+export type NeedsYouItem =
+  | {
+      kind: 'vote'
+      clubId: string
+      clubName: string
+      roundId: string
+      deadline: string
+      timezone: string
+    }
+  | {
+      kind: 'review'
+      clubId: string
+      clubName: string
+      clubBookId: string
+      bookTitle: string
+      finishedCount: number
+      memberCount: number
+    }
+
+/** Open ballots to rank and current books to review, across the caller's clubs. */
+export const needsYouQuery = (userId: string) =>
+  queryOptions({
+    queryKey: ['clubs', 'needs-you', userId],
+    // Changes whenever anyone in any club starts a vote or nominates.
+    staleTime: 0,
+    queryFn: async () =>
+      unwrap(await getSupabase().rpc('needs_you')).map((r): NeedsYouItem =>
+        r.kind === 'vote'
+          ? {
+              kind: 'vote',
+              clubId: r.club_id,
+              clubName: r.club_name,
+              roundId: r.round_id,
+              deadline: r.deadline,
+              timezone: r.timezone,
+            }
+          : {
+              kind: 'review',
+              clubId: r.club_id,
+              clubName: r.club_name,
+              clubBookId: r.club_book_id,
+              bookTitle: r.book_title,
+              finishedCount: r.finished_count,
+              memberCount: r.member_count,
+            },
+      ),
+  })
+
+export const profileStatsQuery = (userId: string) =>
+  queryOptions({
+    queryKey: ['profile', userId, 'stats'],
+    queryFn: async () => {
+      const row = unwrap(await getSupabase().rpc('profile_stats')).at(0)
+      return {
+        booksRead: row?.books_read ?? 0,
+        reviewCount: row?.review_count ?? 0,
+        average: nullableNumber(row?.average),
+      }
+    },
+  })

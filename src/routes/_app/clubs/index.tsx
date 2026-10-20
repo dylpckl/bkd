@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { ChevronRight, Plus } from 'lucide-react'
+import { BookCheck, ChevronRight, ListOrdered, Plus } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import { Avatar, ClubMark } from '#/components/avatar'
 import {
@@ -14,15 +14,20 @@ import {
   ROLE_LABEL,
   avatarSrc,
   myClubsQuery,
+  needsYouQuery,
   profileQuery,
 } from '#/lib/queries'
+import type { NeedsYouItem } from '#/lib/queries'
 import { closesShort } from '#/lib/dates'
+import { cn } from '#/lib/utils'
+import type { ReactNode } from 'react'
 
 export const Route = createFileRoute('/_app/clubs/')({
   loader: ({ context }) =>
     Promise.all([
       context.queryClient.ensureQueryData(myClubsQuery(context.user.id)),
       context.queryClient.ensureQueryData(profileQuery(context.user.id)),
+      context.queryClient.fetchQuery(needsYouQuery(context.user.id)),
     ]),
   head: () => ({ meta: [{ title: 'Your clubs' }] }),
   component: ClubsPage,
@@ -32,6 +37,7 @@ function ClubsPage() {
   const { user } = Route.useRouteContext()
   const { data: clubs } = useSuspenseQuery(myClubsQuery(user.id))
   const { data: profile } = useSuspenseQuery(profileQuery(user.id))
+  const { data: todos } = useSuspenseQuery(needsYouQuery(user.id))
 
   return (
     <Screen>
@@ -61,7 +67,21 @@ function ClubsPage() {
           </div>
         ) : (
           <>
-            <SectionLabel>Clubs</SectionLabel>
+            {todos.length > 0 && (
+              <>
+                <SectionLabel>Needs you</SectionLabel>
+                <ul className="flex flex-col gap-2.5">
+                  {todos.map((t) => (
+                    <li key={t.kind === 'vote' ? t.roundId : t.clubBookId}>
+                      <TodoRow item={t} />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            <SectionLabel className={todos.length > 0 ? 'mt-2.5' : ''}>
+              Clubs
+            </SectionLabel>
             <ul className="flex flex-col gap-3">
               {clubs.map((club) => (
                 <li key={club.id}>
@@ -115,5 +135,62 @@ function ClubsPage() {
         </Button>
       </FooterBar>
     </Screen>
+  )
+}
+
+function TodoRow({ item: t }: { item: NeedsYouItem }) {
+  const className =
+    'bg-card text-foreground hover:text-foreground flex min-h-11 items-center gap-3 rounded-[14px] border px-3.5 py-3 hover:border-stone-400'
+  const row = (
+    icon: ReactNode,
+    iconClass: string,
+    title: string,
+    meta: string,
+  ) => (
+    <>
+      <span
+        aria-hidden
+        className={cn(
+          'inline-flex size-9 shrink-0 items-center justify-center rounded-[10px]',
+          iconClass,
+        )}
+      >
+        {icon}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <strong className="text-sm">{title}</strong>
+        <span className="text-muted-foreground truncate text-[13px]">
+          {t.clubName} · {meta}
+        </span>
+      </span>
+      <ChevronRight className="size-5 shrink-0 text-stone-500" aria-hidden />
+    </>
+  )
+  return t.kind === 'vote' ? (
+    <Link
+      to="/c/$clubId/votes/$roundId"
+      params={{ clubId: t.clubId, roundId: t.roundId }}
+      className={className}
+    >
+      {row(
+        <ListOrdered className="size-5" />,
+        'bg-warning-soft text-warning-foreground',
+        'Rank your ballot',
+        closesShort(t.deadline, t.timezone),
+      )}
+    </Link>
+  ) : (
+    <Link
+      to="/c/$clubId/books/$bookId/review"
+      params={{ clubId: t.clubId, bookId: t.clubBookId }}
+      className={className}
+    >
+      {row(
+        <BookCheck className="size-5" />,
+        'bg-primary-soft text-primary',
+        `Finished ${t.bookTitle}? Post your review`,
+        `${t.finishedCount} of ${t.memberCount} finished`,
+      )}
+    </Link>
   )
 }

@@ -48,6 +48,29 @@ insert into public.club_members (club_id, user_id, role) values
 insert into public.club_invites (club_id, token, created_by, expires_at, max_uses) values
   ('10000000-0000-4000-8000-000000000001', 'demo-invite-overdue', '00000000-0000-4000-8000-000000000001', now() + interval '30 days', 50);
 
+-- The Overdue Society's reading history: three finished books and one being read.
+insert into public.books (id, google_books_id, title, authors, page_count) values
+  ('20000000-0000-4000-8000-000000000001', 'seed-circe', 'Circe', '{Madeline Miller}', 393),
+  ('20000000-0000-4000-8000-000000000002', 'seed-hyperion', 'Hyperion', '{Dan Simmons}', 482),
+  ('20000000-0000-4000-8000-000000000003', 'seed-remains', 'The Remains of the Day', '{Kazuo Ishiguro}', 245),
+  ('20000000-0000-4000-8000-000000000004', 'seed-piranesi', 'Piranesi', '{Susanna Clarke}', 272);
+
+insert into public.club_books (id, club_id, book_id, number, status, started_at, finished_at) values
+  ('21000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 1, 'finished', now() - interval '150 days', now() - interval '105 days'),
+  ('21000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002', 2, 'finished', now() - interval '105 days', now() - interval '55 days'),
+  ('21000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000003', 3, 'finished', now() - interval '55 days', now() - interval '9 days'),
+  ('21000000-0000-4000-8000-000000000004', '10000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000004', 4, 'reading', now() - interval '9 days', null);
+
+-- Ratings are half-stars (8 = 4 stars). Dylan hasn't reviewed Piranesi yet.
+insert into public.reviews (club_book_id, user_id, rating, body)
+select ('21000000-0000-4000-8000-00000000000' || b)::uuid, ('00000000-0000-4000-8000-00000000000' || u)::uuid, rating, body
+from (values
+  (1, 1, 7, 'Loved the island chapters.'), (1, 2, 8, null), (1, 3, 6, null), (1, 6, 8, 'Gorgeous prose.'),
+  (2, 1, 8, 'The Priest''s Tale!'), (2, 2, 9, null), (2, 4, 7, null), (2, 5, 8, null),
+  (3, 1, 8, null), (3, 3, 7, 'Quietly devastating.'), (3, 5, 7, null), (3, 6, 8, null),
+  (4, 2, 9, 'The House is beautiful.'), (4, 6, 8, null)
+) as r (b, u, rating, body);
+
 -- Lets pg_cron call close-round on the local stack. These are the fixed local
 -- defaults of `supabase start`; production sets its own values in Vault.
 select vault.create_secret('http://kong:8000/functions/v1/close-round', 'close_round_url');
