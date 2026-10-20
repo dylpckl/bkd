@@ -27,13 +27,20 @@ These block specific work, so each one is tagged with the phase it blocks. Each 
 
 Smaller copy and style notes are listed in **§7 Mockup → spec reconciliation**.
 
+### Decided while building phase 1
+- **Invite tokens are stored as-is, not only as a hash.** Club settings has to show the same link again, which a hash can't do. Only the club's admins can read the token (RLS). Making a new link revokes the old one, so settings shows one link at a time.
+- **Settings is admin-only** (matching the mockup note). Members leave from a "Leave club" button on club home. Admins who aren't the owner leave from settings.
+- **Role rules:** the owner can promote and demote anyone. Admins can promote members and remove members, but can't demote or remove other admins.
+- **The reset email goes through `/auth/callback?next=/reset-password`** (PKCE), not straight to `/reset-password`. The link has to be opened in the browser that asked for it. The page says so when it fails.
+- **shadcn/ui components were copied from the upstream GitHub source**, because the shadcn registry host is blocked in the build environment. Add new ones the same way, or with `pnpm dlx shadcn add` where it's reachable.
+
 ---
 
 ## 1. Architecture
 
 ```
 bkd/
-  app/                         TanStack Start app
+  src/                         TanStack Start app
     routes/                    file routes (see §4)
     components/ui/             shadcn/ui (generated)
     components/                app components (BookCover, Avatar, StarInput, Ballot, BookSheet…)
@@ -56,10 +63,10 @@ bkd/
   docs/PLAN.md
 ```
 
-- **Single repo, no monorepo tooling.** `packages/irv` is a plain folder with its own `index.ts`. The app imports it through a tsconfig path alias. The edge function (Deno) imports it by relative path. Both runtimes can run plain TS with no Node-only APIs, so one source file serves both.
+- **Single repo, no monorepo tooling.** `packages/irv` is a plain folder with its own `index.ts`. The app imports it through a relative path or alias. The edge function (Deno) imports it by relative path. Both runtimes can run plain TS with no Node-only APIs, so one source file serves both.
 - **Package manager:** pnpm.
 - **Data access rule:** reads go through `supabase-js` under RLS, from the browser or from loaders via the SSR client. Writes that involve multiple rows or invariants go through **Postgres RPCs** (security definer, with explicit checks), not client-side multi-step writes. These are: `accept_invite`, `create_club`, `change_nomination`, `save_ballot`, `start_round`, `update_round`, `post_review`. Server functions (`createServerFn`) are kept for things that need secrets or the app origin: building invite URLs and triggering an early close.
-- **Types:** `supabase gen types typescript --local > app/lib/supabase/database.types.ts`, as a script run after every migration. CI checks that it's up to date.
+- **Types:** `supabase gen types typescript --local > src/lib/supabase/database.types.ts` (`pnpm db:types`), as a script run after every migration. CI checks that it's up to date.
 
 ### Auth plumbing
 - `@supabase/ssr` `createServerClient` in a request-scoped helper that reads and writes cookies through TanStack Start's `getCookie`/`setCookie`. The browser client is a singleton.
@@ -186,7 +193,7 @@ Map the mockup into the Tailwind v4 `@theme` and the shadcn CSS variables:
 
 Each phase ends deployed to preview, with its tests green. Estimates assume one developer working with Claude.
 
-### P1: Foundation (≈ 1 week)
+### P1: Foundation (≈ 1 week) — done
 1. Scaffold TanStack Start + TS strict + Tailwind v4 + shadcn/ui (init plus Button, Input, Label, Tabs, Card, Dialog, Drawer, Command, DropdownMenu, Switch, Calendar/Popover, Sonner). ESLint + Prettier. Vitest.
 2. `config.ts` (`APP_NAME`, `APP_URL`), env schema (zod) for `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `APP_URL`, server-only `SUPABASE_SERVICE_ROLE_KEY` (only used by the server fn for early close if needed).
 3. Supabase project (cloud) + local CLI config. Migrations: profiles (+ trigger from `auth.users`, name from metadata or the Google `full_name`), clubs, club_members, club_invites, helpers, RLS, `create_club`, `create_invite`, `revoke_invite`, `invite_preview`, `accept_invite`, role-change RPCs, `transfer_ownership`, `leave_club`, `delete_club`.
