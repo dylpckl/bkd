@@ -56,6 +56,7 @@ test('admin starts an anonymous vote; a member nominates, then changes their pic
   await member.getByRole('combobox', { name: 'Search books' }).fill('piranesi')
   await member.getByRole('option', { name: /Piranesi/ }).click()
   await member.getByRole('button', { name: 'Nominate this instead' }).click()
+  await expect(member.getByText('Changed to Piranesi')).toBeVisible()
   await expect(
     member.getByRole('button', { name: 'Change your nomination, Piranesi' }),
   ).toBeVisible()

@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react'
 
-/** False during SSR and the first render, then tracks the query. */
+const matchesNow = (query: string) =>
+  typeof window !== 'undefined' && window.matchMedia(query).matches
+
+/**
+ * Tracks a media query. Reads it synchronously on first render in the browser,
+ * so components mounted on demand (sheets, dialogs) get the right answer
+ * immediately instead of flashing the wrong layout. False during SSR.
+ */
 export function useMediaQuery(query: string) {
-  const [matches, setMatches] = useState(false)
+  const [matches, setMatches] = useState(() => matchesNow(query))
   useEffect(() => {
     const mql = window.matchMedia(query)
     const update = () => setMatches(mql.matches)
@@ -11,13 +18,4 @@ export function useMediaQuery(query: string) {
     return () => mql.removeEventListener('change', update)
   }, [query])
   return matches
-}
-
-export function useDebouncedValue<T>(value: T, ms: number) {
-  const [debounced, setDebounced] = useState(value)
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), ms)
-    return () => clearTimeout(t)
-  }, [value, ms])
-  return debounced
 }

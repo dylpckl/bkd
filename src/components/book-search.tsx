@@ -16,7 +16,7 @@ import { Textarea } from '#/components/ui/textarea'
 import { BookCover } from '#/components/book-cover'
 import { BookDetails } from '#/components/book-details'
 import { ResponsiveSheet } from '#/components/responsive-sheet'
-import { useDebouncedValue } from '#/hooks/use-media-query'
+import { useDebouncedValue } from '#/hooks/use-debounced-value'
 import { authorLine, fromSearchResult, publishedYear } from '#/lib/books'
 import type { BookInfo, SearchResult } from '#/lib/books'
 import { errorMessage, invokeFunction } from '#/lib/errors'
@@ -66,23 +66,24 @@ export function BookSearch({
   const left = round.max_nominations_per_member - mine
 
   const nominate = useMutation({
-    mutationFn: (book: BookInfo) =>
+    // `replacing` goes in the variables: after the refetch it's gone from props.
+    mutationFn: (vars: { book: BookInfo; replaceId: string | null }) =>
       invokeFunction<{ nomination_id: string }>('nominate', {
         round_id: round.id,
-        google_books_id: book.google_books_id,
+        google_books_id: vars.book.google_books_id,
         pitch: pitch.trim() || undefined,
-        replace_nomination_id: replacing?.id,
+        replace_nomination_id: vars.replaceId ?? undefined,
       }),
-    onSuccess: async (_, book) => {
-      await queryClient.invalidateQueries({ queryKey: ['round', round.id] })
-      await queryClient.invalidateQueries({ queryKey: ['club', round.club_id] })
+    onSuccess: (_, { book, replaceId }) => {
       toast.success(
-        replacing ? `Changed to ${book.title}` : `Nominated ${book.title}`,
+        replaceId ? `Changed to ${book.title}` : `Nominated ${book.title}`,
       )
       setSelected(null)
       setPitch('')
       setQuery('')
       onOpenChange(false)
+      void queryClient.invalidateQueries({ queryKey: ['round', round.id] })
+      void queryClient.invalidateQueries({ queryKey: ['club', round.club_id] })
     },
     onError: (e) =>
       toast.error(errorMessage(e, "Couldn't nominate that book. Try again.")),
@@ -166,7 +167,11 @@ export function BookSearch({
                     key={book.google_books_id}
                     value={book.google_books_id}
                     disabled={!!taken}
-                    onSelect={() => setSelected(book)}
+                    onSelect={() => {
+                      // Each book starts with an empty pitch.
+                      setPitch('')
+                      setSelected(book)
+                    }}
                     className="min-h-17 gap-3 rounded-lg px-3 py-2.5"
                   >
                     <BookCover
@@ -219,7 +224,12 @@ export function BookSearch({
                 <>
                   <Button
                     size="lg"
-                    onClick={() => nominate.mutate(selected)}
+                    onClick={() =>
+                      nominate.mutate({
+                        book: selected,
+                        replaceId: replacing?.id ?? null,
+                      })
+                    }
                     disabled={nominate.isPending}
                   >
                     {replacing ? 'Nominate this instead' : 'Nominate this book'}

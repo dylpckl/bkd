@@ -36,7 +36,9 @@ export function closesShort(iso: string, timeZone?: string, now = new Date()) {
 /** "3 days left", "1 day left", "Last day". */
 export function daysLeftLabel(iso: string, now = new Date()) {
   const left = daysLeft(iso, now)
-  if (left <= 1) return 'Last day'
+  // Between the deadline and the close job running (up to 5 minutes).
+  if (left === 0) return 'Voting closed'
+  if (left === 1) return 'Last day'
   return `${left} days left`
 }
 
