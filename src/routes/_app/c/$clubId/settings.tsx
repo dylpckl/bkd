@@ -37,11 +37,21 @@ import {
   SectionLabel,
 } from '#/components/layout'
 import { InviteLinkField, useInviteActions } from '#/components/invite-link'
-import { activeInviteQuery, clubQuery, membersQuery } from '#/lib/queries'
+import {
+  ROLE_LABEL,
+  activeInviteQuery,
+  clubQuery,
+  membersQuery,
+} from '#/lib/queries'
 import type { ClubRole } from '#/lib/queries'
 import { getSupabaseBrowserClient } from '#/lib/supabase/browser'
 import { errorMessage, must } from '#/lib/errors'
 import { inviteStatusLine } from '#/lib/invites'
+import {
+  CLUB_DESCRIPTION_MAX,
+  CLUB_NAME_MAX,
+  MAX_INVITE_USES,
+} from '#/lib/limits'
 import { cn } from '#/lib/utils'
 
 export const Route = createFileRoute('/_app/c/$clubId/settings')({
@@ -60,11 +70,6 @@ export const Route = createFileRoute('/_app/c/$clubId/settings')({
   component: SettingsPage,
 })
 
-const ROLE_LABEL: Record<ClubRole, string> = {
-  owner: 'Owner',
-  admin: 'Admin',
-  member: 'Member',
-}
 const joinedFmt = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   year: 'numeric',
@@ -79,16 +84,20 @@ function SettingsPage() {
   const [description, setDescription] = useState(club?.description ?? '')
 
   const save = useMutation({
-    mutationFn: () =>
-      must(
+    mutationFn: async () => {
+      const rows = await must(
         getSupabaseBrowserClient()
           .from('clubs')
           .update({
             name: name.trim(),
             description: description.trim() || null,
           })
-          .eq('id', clubId),
-      ),
+          .eq('id', clubId)
+          .select('id'),
+      )
+      // RLS turns a disallowed update into "0 rows changed", not an error.
+      if (!rows?.length) throw { message: 'not_allowed' }
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['club', clubId] })
       await queryClient.invalidateQueries({ queryKey: ['clubs'] })
@@ -125,7 +134,7 @@ function SettingsPage() {
               <Input
                 id="cn"
                 required
-                maxLength={80}
+                maxLength={CLUB_NAME_MAX}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
@@ -139,7 +148,7 @@ function SettingsPage() {
               </Label>
               <Input
                 id="cd"
-                maxLength={500}
+                maxLength={CLUB_DESCRIPTION_MAX}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
@@ -291,10 +300,18 @@ function NewInviteDialog({
 }) {
   const [expiry, setExpiry] = useState('7')
   const [maxUses, setMaxUses] = useState('20')
+  const [maxUsesError, setMaxUsesError] = useState<string | null>(null)
+
+  /** Empty means no limit; anything else must be a whole number from 1 to 500. */
+  const parseMaxUses = (): number | null | 'invalid' => {
+    const raw = maxUses.trim()
+    if (raw === '') return null
+    const n = Number(raw)
+    return Number.isInteger(n) && n >= 1 && n <= MAX_INVITE_USES ? n : 'invalid'
+  }
 
   const create = useMutation({
-    mutationFn: () => {
-      const uses = parseInt(maxUses, 10)
+    mutationFn: (uses: number | null) => {
       return must(
         getSupabaseBrowserClient().rpc('create_invite', {
           p_club_id: clubId,
@@ -304,7 +321,7 @@ function NewInviteDialog({
               : new Date(
                   Date.now() + Number(expiry) * 86_400_000,
                 ).toISOString(),
-          p_max_uses: Number.isFinite(uses) && uses > 0 ? uses : undefined,
+          p_max_uses: uses ?? undefined,
         }),
       )
     },
@@ -323,7 +340,15 @@ function NewInviteDialog({
           className="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault()
-            create.mutate()
+            const uses = parseMaxUses()
+            if (uses === 'invalid') {
+              setMaxUsesError(
+                `Enter a number from 1 to ${MAX_INVITE_USES}, or leave it empty for no limit.`,
+              )
+              return
+            }
+            setMaxUsesError(null)
+            create.mutate(uses)
           }}
         >
           <DialogHeader>
@@ -372,10 +397,20 @@ function NewInviteDialog({
               type="number"
               inputMode="numeric"
               min={1}
-              max={500}
+              max={MAX_INVITE_USES}
               value={maxUses}
               onChange={(e) => setMaxUses(e.target.value)}
+              aria-invalid={!!maxUsesError}
+              aria-describedby={maxUsesError ? 'max-uses-error' : undefined}
             />
+            {maxUsesError && (
+              <p
+                id="max-uses-error"
+                className="text-destructive mt-1.5 text-[13px] font-medium"
+              >
+                {maxUsesError}
+              </p>
+            )}
           </div>
           <DialogFooter>
             <Button
@@ -647,6 +682,7 @@ function OwnerSection({
                 p_club_id: clubId,
               }),
             )
+            queryClient.removeQueries({ queryKey: ['club', clubId] })
             await queryClient.invalidateQueries({ queryKey: ['clubs'] })
             navigate({ to: '/clubs' })
           } catch (e) {

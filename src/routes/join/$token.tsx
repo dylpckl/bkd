@@ -7,7 +7,7 @@ import { FooterBar, Panel, Screen } from '#/components/layout'
 import { LogoMark } from '#/components/logo'
 import { avatarSrc, invitePreviewQuery } from '#/lib/queries'
 import { getSupabaseBrowserClient } from '#/lib/supabase/browser'
-import { errorMessage } from '#/lib/errors'
+import { errorMessage, must } from '#/lib/errors'
 
 export const Route = createFileRoute('/join/$token')({
   loader: ({ context, params }) =>
@@ -52,12 +52,12 @@ function JoinPage() {
 
   const join = useMutation({
     mutationFn: async () => {
-      const { data, error } = await getSupabaseBrowserClient().rpc(
-        'accept_invite',
-        { p_token: token },
+      const rows = await must(
+        getSupabaseBrowserClient().rpc('accept_invite', { p_token: token }),
       )
-      if (error) throw error
-      return data[0]
+      const result = rows?.[0]
+      if (!result) throw { message: 'server_error' }
+      return result
     },
     onSuccess: (result) => {
       if (

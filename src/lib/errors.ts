@@ -7,6 +7,7 @@ const MESSAGES: Record<string, string> = {
   use_leave_club: 'Use "Leave club" to remove yourself.',
   already_owner: "You're already the owner.",
   invalid_expiry: 'Pick an expiry date in the future.',
+  invalid_max_uses: 'Max people must be a number from 1 to 500.',
   round_not_open: 'Voting for this book has closed.',
   round_already_open: 'There’s already a vote open in this club.',
   deadline_in_past: 'Pick a closing date that hasn’t passed yet.',
