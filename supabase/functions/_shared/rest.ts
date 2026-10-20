@@ -49,6 +49,12 @@ export function asUser(authorization: string) {
 
 /** Service-role requests. Bypasses RLS; only for writes users can't make themselves. */
 export const asService = {
+  rpc: <T>(fn: string, args: Record<string, unknown>) =>
+    call<T>(
+      `rpc/${fn}`,
+      { method: 'POST', body: JSON.stringify(args) },
+      { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+    ),
   upsert: <T>(
     table: string,
     row: Record<string, unknown>,
@@ -65,4 +71,9 @@ export const asService = {
       },
       { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
     ),
+}
+
+/** True when the request carries the service-role key (pg_cron), not a user's JWT. */
+export function isServiceCall(authorization: string | null) {
+  return authorization === `Bearer ${SERVICE_KEY}`
 }

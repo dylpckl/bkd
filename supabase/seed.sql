@@ -47,3 +47,11 @@ insert into public.club_members (club_id, user_id, role) values
 -- Open the Overdue Society invite at http://localhost:3000/join/demo-invite-overdue
 insert into public.club_invites (club_id, token, created_by, expires_at, max_uses) values
   ('10000000-0000-4000-8000-000000000001', 'demo-invite-overdue', '00000000-0000-4000-8000-000000000001', now() + interval '30 days', 50);
+
+-- Lets pg_cron call close-round on the local stack. These are the fixed local
+-- defaults of `supabase start`; production sets its own values in Vault.
+select vault.create_secret('http://kong:8000/functions/v1/close-round', 'close_round_url');
+select vault.create_secret(
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU',
+  'close_round_key'
+);

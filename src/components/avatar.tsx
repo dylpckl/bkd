@@ -9,6 +9,8 @@ type Props = {
   className?: string
   /** Decorative avatars sit next to the person's name, so screen readers skip them. */
   decorative?: boolean
+  /** Accessible name when not decorative; defaults to `name`. */
+  label?: string
 }
 
 export function Avatar({
@@ -18,6 +20,7 @@ export function Avatar({
   size = 32,
   className,
   decorative = true,
+  label,
 }: Props) {
   const style = {
     width: size,
@@ -26,12 +29,12 @@ export function Avatar({
   }
   const a11y = decorative
     ? { 'aria-hidden': true as const }
-    : { role: 'img', 'aria-label': name }
+    : { role: 'img', 'aria-label': label ?? name }
   if (src) {
     return (
       <img
         src={src}
-        alt={decorative ? '' : name}
+        alt={decorative ? '' : (label ?? name)}
         style={style}
         className={cn('shrink-0 rounded-full object-cover', className)}
         referrerPolicy="no-referrer"

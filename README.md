@@ -22,6 +22,8 @@ Sign-up, magic-link and reset emails don't go out locally. Open them in Mailpit 
 
 Google sign-in is off locally until you add OAuth credentials. See the `[auth.external.google]` block in `supabase/config.toml`.
 
+When a vote's deadline passes, pg_cron calls `close-round` within 5 minutes; admins can also close early from Manage voting. Locally the seed sets this up, so it just works.
+
 Book search runs through the `search-books` and `nominate` edge functions, which `supabase start` serves. Without a Google Books API key they return a built-in list of 12 books (try "le guin", "ishiguro" or "piranesi"). To get real results, put `GOOGLE_BOOKS_API_KEY=...` in `supabase/functions/.env` and run `pnpm exec supabase functions serve`.
 
 ## Scripts
@@ -46,7 +48,7 @@ src/
   lib/               config, Supabase clients, auth helpers, queries, copy helpers
 supabase/
   migrations/        schema, RLS, RPCs
-  functions/         edge functions (Deno): search-books, nominate
+  functions/         edge functions (Deno): search-books, nominate, close-round; _shared/irv.ts is the vote counter
   tests/             pgTAP tests
   seed.sql           local demo data
 e2e/                 Playwright tests
@@ -59,6 +61,11 @@ Writes that involve several rows or rules go through Postgres functions (`create
 The app targets Vercel (`vercel.json`). For a hosted Supabase project:
 
 1. Push migrations with `supabase link` and `supabase db push`. Deploy the functions with `supabase functions deploy`, and set the secret with `supabase secrets set GOOGLE_BOOKS_API_KEY=...`.
+   Then let the 5-minute cron reach `close-round`. In the SQL editor, run:
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/close-round', 'close_round_url');
+   select vault.create_secret('<service_role key>', 'close_round_key');
+   ```
 2. In Supabase Auth, set the Site URL to the app origin and add redirect URLs for `<origin>/auth/callback**`. Keep "Confirm email" on.
 3. Set up Google OAuth: add the authorized origin, plus the redirect URI `https://<project>.supabase.co/auth/v1/callback`.
 4. Configure custom SMTP (Resend) before inviting real people.

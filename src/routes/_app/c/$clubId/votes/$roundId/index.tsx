@@ -4,25 +4,28 @@ import {
   notFound,
   useNavigate,
 } from '@tanstack/react-router'
-import { useSuspenseQuery } from '@tanstack/react-query'
-import { useState } from 'react'
-import { ChevronLeft, Plus } from 'lucide-react'
+import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { ChevronLeft, Loader2, Plus, SlidersHorizontal } from 'lucide-react'
 import { z } from 'zod'
 import { Button } from '#/components/ui/button'
-import { Avatar } from '#/components/avatar'
+import { BallotList, useBallot } from '#/components/ballot'
+import type { SaveState } from '#/components/ballot'
 import { BookCover } from '#/components/book-cover'
 import { BookDetails } from '#/components/book-details'
 import { BookSearch } from '#/components/book-search'
-import { Chip, Screen } from '#/components/layout'
+import { Chip, FooterBar, Screen } from '#/components/layout'
+import { Results } from '#/components/results'
 import { ResponsiveSheet } from '#/components/responsive-sheet'
 import {
   clubQuery,
   membersQuery,
+  myBallotQuery,
   nominationsQuery,
+  resultsQuery,
   roundQuery,
 } from '#/lib/queries'
-import type { Nomination } from '#/lib/queries'
-import { authorLine } from '#/lib/books'
+import type { Nomination, Round } from '#/lib/queries'
 import { closesShort, formatDeadline } from '#/lib/dates'
 
 const searchSchema = z.object({
@@ -39,10 +42,25 @@ export const Route = createFileRoute('/_app/c/$clubId/votes/$roundId/')({
       context.queryClient.ensureQueryData(membersQuery(params.clubId)),
     ])
     if (!round || round.club_id !== params.clubId) throw notFound()
-    return { number: round.number }
+    if (round.status === 'open') {
+      await context.queryClient.ensureQueryData(
+        myBallotQuery(params.roundId, context.user.id),
+      )
+    } else if (round.status === 'closed') {
+      await context.queryClient.ensureQueryData(resultsQuery(params.roundId))
+    }
+    return { number: round.number, closed: round.status === 'closed' }
   },
   head: ({ loaderData }) => ({
-    meta: loaderData ? [{ title: `Book ${loaderData.number}` }] : [],
+    meta: loaderData
+      ? [
+          {
+            title: loaderData.closed
+              ? `How book ${loaderData.number} was picked`
+              : `Book ${loaderData.number}`,
+          },
+        ]
+      : [],
   }),
   component: VotePage,
 })
@@ -53,10 +71,15 @@ function VotePage() {
   const navigate = useNavigate({ from: Route.fullPath })
   const { user } = Route.useRouteContext()
   const { data: club } = useSuspenseQuery(clubQuery(clubId, user.id))
-  const { data: round } = useSuspenseQuery(roundQuery(roundId))
+  const { data: round } = useSuspenseQuery({
+    ...roundQuery(roundId),
+    // While votes are being counted, check back until the results land.
+    refetchInterval: (q) => (q.state.data?.status === 'closing' ? 2000 : false),
+  })
   const { data: nominations } = useSuspenseQuery(nominationsQuery(roundId))
   const { data: members } = useSuspenseQuery(membersQuery(clubId))
   const [viewing, setViewing] = useState<Nomination | null>(null)
+  const [saveState, setSaveState] = useState<SaveState>('idle')
   if (!round || !club) return null
 
   const byId = new Map(members.map((m) => [m.userId, m]))
@@ -86,18 +109,39 @@ function VotePage() {
           <ChevronLeft className="size-6" aria-hidden />
         </Link>
         <div className="flex flex-1 flex-col gap-1">
-          <h1 className="font-display text-[26px]">Book {round.number}</h1>
+          <h1 className="font-display text-[26px]">
+            {round.status === 'closed'
+              ? `How book ${round.number} was picked`
+              : `Book ${round.number}`}
+          </h1>
           <span className="flex flex-wrap gap-1.5">
             {open ? (
               <Chip tone="amber">
                 Closes {formatDeadline(round.deadline, round.timezone)}
               </Chip>
+            ) : round.status === 'cancelled' ? (
+              <Chip>Cancelled</Chip>
             ) : (
               <Chip>Voting closed</Chip>
+            )}
+            {open && saveState === 'saved' && <Chip tone="green">✓ Saved</Chip>}
+            {open && saveState === 'saving' && <Chip tone="gray">Saving…</Chip>}
+            {open && saveState === 'error' && (
+              <Chip tone="amber">Not saved yet</Chip>
             )}
             {round.anonymous_nominators && open && <Chip>Anonymous</Chip>}
           </span>
         </div>
+        {club.isAdmin && round.status === 'open' && (
+          <Link
+            to="/c/$clubId/votes/$roundId/manage"
+            params={{ clubId, roundId }}
+            aria-label="Manage voting"
+            className="-mr-2 inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-foreground hover:bg-muted hover:text-foreground"
+          >
+            <SlidersHorizontal className="size-[22px]" aria-hidden />
+          </Link>
+        )}
       </header>
 
       <main className="flex flex-1 flex-col gap-2 px-4 pt-1 pb-48">
@@ -109,59 +153,36 @@ function VotePage() {
             {round.note}
           </p>
         )}
-        <p className="text-muted-foreground text-[13px]">
-          {nominations.length === 0
-            ? 'No books yet. Be the first to nominate one.'
-            : `${nominations.length} ${nominations.length === 1 ? 'book' : 'books'} nominated so far. Tap one for details.`}
-        </p>
-        <ul className="flex flex-col gap-2">
-          {/* Your own nominations live in the footer; you can't rank them. */}
-          {nominations
-            .filter((n) => !n.isMine || !open)
-            .map((n) => {
+        {open ? (
+          <OpenBallot
+            round={round}
+            userId={user.id}
+            nominations={nominations}
+            onOpen={setViewing}
+            onSaveState={setSaveState}
+            nominator={(n) => {
               const by = n.nominatedBy ? byId.get(n.nominatedBy) : undefined
-              return (
-                <li key={n.id}>
-                  <button
-                    type="button"
-                    onClick={() => setViewing(n)}
-                    className="bg-card flex min-h-15 w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left hover:border-stone-400"
-                  >
-                    <BookCover
-                      title={n.book.title}
-                      coverUrl={n.book.cover_url}
-                      idKey={n.book.google_books_id}
-                      width={30}
-                    />
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      {n.isMine && (
-                        <span className="text-muted-foreground text-[10px] font-bold tracking-[0.08em] uppercase">
-                          Your nomination
-                        </span>
-                      )}
-                      <strong className="truncate text-sm font-semibold">
-                        {n.book.title}
-                      </strong>
-                      <span className="text-muted-foreground truncate text-[13px]">
-                        {authorLine(n.book.authors)}
-                      </span>
-                    </span>
-                    {by && (
-                      <span title={`Nominated by ${by.displayName}`}>
-                        <Avatar
-                          id={by.userId}
-                          name={by.displayName}
-                          src={by.avatarUrl}
-                          size={28}
-                          decorative={false}
-                        />
-                      </span>
-                    )}
-                  </button>
-                </li>
-              )
-            })}
-        </ul>
+              return by
+                ? { id: by.userId, name: by.displayName, src: by.avatarUrl }
+                : null
+            }}
+          />
+        ) : round.status === 'closed' ? (
+          <ClosedResults roundId={roundId} nominations={nominations} />
+        ) : round.status === 'closing' || round.status === 'open' ? (
+          <p
+            className="text-muted-foreground flex items-center gap-2 py-6"
+            role="status"
+          >
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            Voting has closed. Counting the votes…
+          </p>
+        ) : (
+          <p className="text-muted-foreground py-6">
+            This vote was cancelled. An admin can start a new one from the club
+            page.
+          </p>
+        )}
       </main>
 
       {open && (
@@ -230,6 +251,20 @@ function VotePage() {
         </div>
       )}
 
+      {!open && (
+        <FooterBar>
+          <Button
+            asChild
+            size="lg"
+            variant={round.status === 'closed' ? 'default' : 'outline'}
+          >
+            <Link to="/c/$clubId" params={{ clubId }}>
+              Back to club
+            </Link>
+          </Button>
+        </FooterBar>
+      )}
+
       <BookSearch
         open={searchOpen}
         onOpenChange={(o) => setSearchOpen(o)}
@@ -272,4 +307,78 @@ function NominatorPitch({
       {nomination.pitch && <p className="mt-1 text-sm">“{nomination.pitch}”</p>}
     </div>
   )
+}
+
+function OpenBallot({
+  round,
+  userId,
+  nominations,
+  onOpen,
+  onSaveState,
+  nominator,
+}: {
+  round: Round
+  userId: string
+  nominations: Nomination[]
+  onOpen: (n: Nomination) => void
+  onSaveState: (s: SaveState) => void
+  nominator: (
+    n: Nomination,
+  ) => { id: string; name: string; src: string | null } | null
+}) {
+  const { data: ballot } = useSuspenseQuery(myBallotQuery(round.id, userId))
+  const { rows, voted, saveState, isNew, commit } = useBallot(
+    round.id,
+    nominations,
+    ballot,
+  )
+  useEffect(() => onSaveState(saveState), [saveState, onSaveState])
+  const anonymous = round.anonymous_nominators
+
+  if (rows.length === 0) {
+    return (
+      <p className="text-muted-foreground py-4 text-[13px]">
+        {nominations.length === 0
+          ? 'No books yet. Be the first to nominate one.'
+          : 'Nothing to rank yet. Other members’ nominations show up here as they come in.'}
+      </p>
+    )
+  }
+
+  return (
+    <>
+      <p className="text-muted-foreground text-[13px]">
+        {rows.length === 1
+          ? 'One book to vote on so far. '
+          : `${rows.length} books to rank. Drag to put them in your order. Your #1 counts first. If it’s knocked out, your vote moves to your #2, then #3, and so on. `}
+        {!voted && rows.length > 1 && 'Your first move casts your vote.'}
+      </p>
+      <BallotList
+        rows={rows}
+        voted={voted}
+        isNew={isNew}
+        onReorder={commit}
+        onOpen={onOpen}
+        nominator={(n) => (anonymous ? null : nominator(n))}
+      />
+      {voted && (
+        <p className="text-muted-foreground mt-1 text-center text-[13px]">
+          Saved automatically · change it anytime until{' '}
+          {formatDeadline(round.deadline, round.timezone)}
+        </p>
+      )}
+    </>
+  )
+}
+
+function ClosedResults({
+  roundId,
+  nominations,
+}: {
+  roundId: string
+  nominations: Nomination[]
+}) {
+  const { data } = useQuery(resultsQuery(roundId))
+  if (!data) return null
+  return <Results tallies={data.tallies} nominations={nominations} />
 }

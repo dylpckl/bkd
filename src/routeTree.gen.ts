@@ -24,6 +24,7 @@ import { Route as AppCClubIdInviteRouteImport } from './routes/_app/c/$clubId/in
 import { Route as AppCClubIdSettingsRouteImport } from './routes/_app/c/$clubId/settings'
 import { Route as AppCClubIdVotesNewRouteImport } from './routes/_app/c/$clubId/votes/new'
 import { Route as AppCClubIdVotesRoundIdIndexRouteImport } from './routes/_app/c/$clubId/votes/$roundId/index'
+import { Route as AppCClubIdVotesRoundIdManageRouteImport } from './routes/_app/c/$clubId/votes/$roundId/manage'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -100,6 +101,12 @@ const AppCClubIdVotesRoundIdIndexRoute =
     path: '/votes/$roundId/',
     getParentRoute: () => AppCClubIdRouteRoute,
   } as any)
+const AppCClubIdVotesRoundIdManageRoute =
+  AppCClubIdVotesRoundIdManageRouteImport.update({
+    id: '/votes/$roundId/manage',
+    path: '/votes/$roundId/manage',
+    getParentRoute: () => AppCClubIdRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/c/$clubId/settings': typeof AppCClubIdSettingsRoute
   '/c/$clubId/': typeof AppCClubIdIndexRoute
   '/c/$clubId/votes/new': typeof AppCClubIdVotesNewRoute
+  '/c/$clubId/votes/$roundId/manage': typeof AppCClubIdVotesRoundIdManageRoute
   '/c/$clubId/votes/$roundId/': typeof AppCClubIdVotesRoundIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -130,6 +138,7 @@ export interface FileRoutesByTo {
   '/c/$clubId/settings': typeof AppCClubIdSettingsRoute
   '/c/$clubId': typeof AppCClubIdIndexRoute
   '/c/$clubId/votes/new': typeof AppCClubIdVotesNewRoute
+  '/c/$clubId/votes/$roundId/manage': typeof AppCClubIdVotesRoundIdManageRoute
   '/c/$clubId/votes/$roundId': typeof AppCClubIdVotesRoundIdIndexRoute
 }
 export interface FileRoutesById {
@@ -148,6 +157,7 @@ export interface FileRoutesById {
   '/_app/c/$clubId/settings': typeof AppCClubIdSettingsRoute
   '/_app/c/$clubId/': typeof AppCClubIdIndexRoute
   '/_app/c/$clubId/votes/new': typeof AppCClubIdVotesNewRoute
+  '/_app/c/$clubId/votes/$roundId/manage': typeof AppCClubIdVotesRoundIdManageRoute
   '/_app/c/$clubId/votes/$roundId/': typeof AppCClubIdVotesRoundIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/c/$clubId/settings'
     | '/c/$clubId/'
     | '/c/$clubId/votes/new'
+    | '/c/$clubId/votes/$roundId/manage'
     | '/c/$clubId/votes/$roundId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -181,6 +192,7 @@ export interface FileRouteTypes {
     | '/c/$clubId/settings'
     | '/c/$clubId'
     | '/c/$clubId/votes/new'
+    | '/c/$clubId/votes/$roundId/manage'
     | '/c/$clubId/votes/$roundId'
   id:
     | '__root__'
@@ -198,6 +210,7 @@ export interface FileRouteTypes {
     | '/_app/c/$clubId/settings'
     | '/_app/c/$clubId/'
     | '/_app/c/$clubId/votes/new'
+    | '/_app/c/$clubId/votes/$roundId/manage'
     | '/_app/c/$clubId/votes/$roundId/'
   fileRoutesById: FileRoutesById
 }
@@ -317,6 +330,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCClubIdVotesRoundIdIndexRouteImport
       parentRoute: typeof AppCClubIdRouteRoute
     }
+    '/_app/c/$clubId/votes/$roundId/manage': {
+      id: '/_app/c/$clubId/votes/$roundId/manage'
+      path: '/votes/$roundId/manage'
+      fullPath: '/c/$clubId/votes/$roundId/manage'
+      preLoaderRoute: typeof AppCClubIdVotesRoundIdManageRouteImport
+      parentRoute: typeof AppCClubIdRouteRoute
+    }
   }
 }
 
@@ -325,6 +345,7 @@ interface AppCClubIdRouteRouteChildren {
   AppCClubIdSettingsRoute: typeof AppCClubIdSettingsRoute
   AppCClubIdIndexRoute: typeof AppCClubIdIndexRoute
   AppCClubIdVotesNewRoute: typeof AppCClubIdVotesNewRoute
+  AppCClubIdVotesRoundIdManageRoute: typeof AppCClubIdVotesRoundIdManageRoute
   AppCClubIdVotesRoundIdIndexRoute: typeof AppCClubIdVotesRoundIdIndexRoute
 }
 
@@ -333,6 +354,7 @@ const AppCClubIdRouteRouteChildren: AppCClubIdRouteRouteChildren = {
   AppCClubIdSettingsRoute: AppCClubIdSettingsRoute,
   AppCClubIdIndexRoute: AppCClubIdIndexRoute,
   AppCClubIdVotesNewRoute: AppCClubIdVotesNewRoute,
+  AppCClubIdVotesRoundIdManageRoute: AppCClubIdVotesRoundIdManageRoute,
   AppCClubIdVotesRoundIdIndexRoute: AppCClubIdVotesRoundIdIndexRoute,
 }
 

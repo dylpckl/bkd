@@ -39,7 +39,7 @@ export const myClubsQuery = (userId: string) =>
         await getSupabase()
           .from('club_members')
           .select(
-            'role, joined_at, club:clubs!inner(id, name, description, created_at, members:club_members(count), rounds(id, number, status, deadline, timezone))',
+            'role, joined_at, club:clubs!inner(id, name, description, created_at, members:club_members(count), rounds(id, number, status, deadline, timezone), club_books(status, book:books(title)))',
           )
           .eq('user_id', userId)
           .order('joined_at', { ascending: false }),
@@ -54,6 +54,9 @@ export const myClubsQuery = (userId: string) =>
           r.club.rounds.find(
             (x) => x.status === 'open' || x.status === 'closing',
           ) ?? null,
+        reading:
+          r.club.club_books.find((b) => b.status === 'reading')?.book.title ??
+          null,
       }))
     },
   })
@@ -170,7 +173,10 @@ export function avatarSrc(p: {
   return p.avatar_url
 }
 
-export type Round = Database['public']['Tables']['rounds']['Row']
+export type Round = Omit<
+  Database['public']['Tables']['rounds']['Row'],
+  'close_claimed_at'
+>
 
 const ROUND_COLUMNS =
   'id, club_id, number, status, deadline, timezone, max_nominations_per_member, anonymous_nominators, note, winner_nomination_id, created_by, created_at, closed_at'
@@ -232,3 +238,94 @@ export const nominationsQuery = (roundId: string) =>
 export type Nomination = Awaited<
   ReturnType<NonNullable<ReturnType<typeof nominationsQuery>['queryFn']>>
 >[number]
+
+export const myBallotQuery = (roundId: string, userId: string) =>
+  queryOptions({
+    queryKey: ['round', roundId, 'ballot', userId],
+    queryFn: async () => {
+      const supabase = getSupabase()
+      const [header, rankings] = await Promise.all([
+        supabase
+          .from('ballots')
+          .select('first_cast_at')
+          .eq('round_id', roundId)
+          .eq('user_id', userId)
+          .maybeSingle(),
+        supabase
+          .from('ballot_rankings')
+          .select('nomination_id, rank')
+          .eq('round_id', roundId)
+          .eq('user_id', userId)
+          .order('rank'),
+      ])
+      const head = unwrapMaybe(header)
+      const ranked = unwrap(rankings).map((r) => r.nomination_id)
+      return head ? { firstCastAt: head.first_cast_at, ranking: ranked } : null
+    },
+  })
+
+export const voteStatusQuery = (roundId: string) =>
+  queryOptions({
+    queryKey: ['round', roundId, 'vote-status'],
+    queryFn: async () =>
+      unwrap(
+        await getSupabase().rpc('round_vote_status', { p_round_id: roundId }),
+      ),
+  })
+
+export type IrvTallies = {
+  method: 'single' | 'random' | 'irv'
+  winner: string
+  ballots: number
+  counts: {
+    votes: Record<string, number>
+    exhausted: number
+    eliminated?: string
+    tiebreak?: string
+  }[]
+  finishingOrder: {
+    id: string
+    place: number
+    finalVotes: number
+    outcome: 'winner' | 'runner-up' | 'still-in' | 'knocked-out' | 'not-picked'
+    knockedOutOrder?: number
+    tiebreak?: 'previous' | 'appearances' | 'random'
+  }[]
+  seed: string
+}
+
+export const resultsQuery = (roundId: string) =>
+  queryOptions({
+    queryKey: ['round', roundId, 'results'],
+    queryFn: async () => {
+      const row = unwrapMaybe(
+        await getSupabase()
+          .from('round_results')
+          .select('tallies, computed_at')
+          .eq('round_id', roundId)
+          .maybeSingle(),
+      )
+      return row
+        ? {
+            tallies: row.tallies as unknown as IrvTallies,
+            computedAt: row.computed_at,
+          }
+        : null
+    },
+  })
+
+export const currentBookQuery = (clubId: string) =>
+  queryOptions({
+    queryKey: ['club', clubId, 'current-book'],
+    queryFn: async () =>
+      unwrapMaybe(
+        await getSupabase()
+          .from('club_books')
+          .select(
+            `id, number, status, started_at, round_id, book:books!inner(${BOOK_COLUMNS})`,
+          )
+          .eq('club_id', clubId)
+          .eq('status', 'reading')
+          .maybeSingle(),
+      ),
+  })
