@@ -34,6 +34,8 @@ export function LeaveClubButton({ clubId }: { clubId: string }) {
                 p_club_id: clubId,
               }),
             )
+            // Drop the club's cached data so going back can't show a club you left.
+            queryClient.removeQueries({ queryKey: ['club', clubId] })
             await queryClient.invalidateQueries({ queryKey: ['clubs'] })
             navigate({ to: '/clubs' })
           } catch (e) {

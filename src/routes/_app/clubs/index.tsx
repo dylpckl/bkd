@@ -10,10 +10,13 @@ import {
   ScreenBody,
   SectionLabel,
 } from '#/components/layout'
-import { avatarSrc, myClubsQuery, profileQuery } from '#/lib/queries'
+import {
+  ROLE_LABEL,
+  avatarSrc,
+  myClubsQuery,
+  profileQuery,
+} from '#/lib/queries'
 import { closesShort } from '#/lib/dates'
-
-const ROLE_LABEL = { owner: 'Owner', admin: 'Admin', member: 'Member' } as const
 
 export const Route = createFileRoute('/_app/clubs/')({
   loader: ({ context }) =>

@@ -4,6 +4,12 @@ import type { Database } from './supabase'
 
 export type ClubRole = Database['public']['Enums']['club_role']
 
+export const ROLE_LABEL: Record<ClubRole, string> = {
+  owner: 'Owner',
+  admin: 'Admin',
+  member: 'Member',
+}
+
 type Result = { data: unknown; error: unknown }
 
 function unwrap<TResult extends Result>(
@@ -116,7 +122,10 @@ export const activeInviteQuery = (clubId: string) =>
       const rows = unwrap(
         await getSupabase()
           .from('club_invites')
-          .select('id, token, expires_at, max_uses, use_count, created_at')
+          // status comes from the same invite_status() that accept_invite enforces.
+          .select(
+            'id, token, expires_at, max_uses, use_count, created_at, status:invite_status',
+          )
           .eq('club_id', clubId)
           .is('revoked_at', null)
           .order('created_at', { ascending: false })
@@ -124,11 +133,13 @@ export const activeInviteQuery = (clubId: string) =>
       )
       const invite = rows.at(0)
       if (!invite) return null
-      const expired =
-        invite.expires_at !== null && new Date(invite.expires_at) <= new Date()
-      const maxed =
-        invite.max_uses !== null && invite.use_count >= invite.max_uses
-      return { ...invite, usable: !expired && !maxed, expired, maxed }
+      const status = invite.status as string
+      return {
+        ...invite,
+        usable: status === 'valid',
+        expired: status === 'expired',
+        maxed: status === 'maxed',
+      }
     },
   })
 

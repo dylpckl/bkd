@@ -28,6 +28,7 @@ import {
 import { avatarSrc, myClubsQuery, profileQuery } from '#/lib/queries'
 import { getSupabaseBrowserClient } from '#/lib/supabase/browser'
 import { errorMessage, must } from '#/lib/errors'
+import { DISPLAY_NAME_MAX } from '#/lib/limits'
 
 export const Route = createFileRoute('/_app/profile')({
   loader: ({ context }) =>
@@ -118,7 +119,7 @@ function ProfilePage() {
               <Input
                 id="display-name"
                 required
-                maxLength={60}
+                maxLength={DISPLAY_NAME_MAX}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 aria-describedby="name-hint"
