@@ -71,3 +71,21 @@ export const asService = {
       { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
     ),
 }
+
+/**
+ * Verifies the bearer token belongs to a real signed-in user. The anon key is
+ * itself a valid JWT, so the gateway lets anon-key-only callers through; asking
+ * the auth server for the user rejects those (their token has no user).
+ */
+export async function getUserId(authorization: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: ANON_KEY, Authorization: authorization },
+    })
+    if (!res.ok) return null
+    const user = (await res.json()) as { id?: string; is_anonymous?: boolean }
+    return user.id && !user.is_anonymous ? user.id : null
+  } catch {
+    return null
+  }
+}

@@ -18,6 +18,11 @@ const MESSAGES: Record<string, string> = {
   picks_cannot_decrease: 'Picks each can’t go down once people have nominated.',
   search_unavailable:
     'Book search isn’t available right now. Try again in a minute.',
+  search_not_configured:
+    'Book search isn�t set up yet. Ask the app owner to finish setup.',
+  rate_limited: 'Too many searches. Wait a moment and try again.',
+  bad_request: 'That request wasn�t valid. Check your input and try again.',
+  invalid_input: 'That request wasn�t valid. Check your input and try again.',
   book_not_found: 'That book couldn’t be found. Try another result.',
 }
 
