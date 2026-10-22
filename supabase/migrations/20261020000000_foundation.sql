@@ -11,7 +11,7 @@ create type public.club_role as enum ('owner', 'admin', 'member');
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   display_name text not null check (char_length(btrim(display_name)) between 1 and 60),
-  avatar_url text,
+  avatar_url text check (avatar_url is null or (avatar_url ~* '^https://[^[:space:]]+$' and char_length(avatar_url) <= 2048)),
   avatar_path text,
   created_at timestamptz not null default now()
 );
@@ -120,10 +120,16 @@ begin
       nullif(btrim(new.raw_user_meta_data ->> 'display_name'), ''),
       nullif(btrim(new.raw_user_meta_data ->> 'full_name'), ''),
       nullif(btrim(new.raw_user_meta_data ->> 'name'), ''),
-      split_part(new.email, '@', 1),
+      nullif(btrim(split_part(new.email, '@', 1)), ''),
       'Reader'
     ), 60),
-    coalesce(new.raw_user_meta_data ->> 'avatar_url', new.raw_user_meta_data ->> 'picture')
+    -- Only https avatars are kept (Google's are); anything else is dropped.
+    (select u from unnest(array[
+        new.raw_user_meta_data ->> 'avatar_url',
+        new.raw_user_meta_data ->> 'picture'
+      ]) as u
+      where u ~* '^https://[^[:space:]]+$' and char_length(u) <= 2048
+      limit 1)
   );
   return new;
 end;
@@ -132,6 +138,24 @@ $$;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- Deleting an account would cascade away its club_members rows and leave any club it
+-- owns without an owner. Make the owner transfer or delete those clubs first.
+create function public.prevent_owner_profile_delete()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if exists (select 1 from public.club_members where user_id = old.id and role = 'owner') then
+    raise exception 'owner_has_clubs';
+  end if;
+  return old;
+end;
+$$;
+
+create trigger profiles_prevent_owner_delete
+  before delete on public.profiles
+  for each row execute function public.prevent_owner_profile_delete();
 
 -- ---------------------------------------------------------------------------
 -- Row level security
@@ -186,11 +210,21 @@ declare
   v_uid uuid := (select auth.uid());
   v_club uuid;
   v_token text := public.new_invite_token();
+  v_name text := btrim(coalesce(p_name, ''));
+  v_description text := nullif(btrim(coalesce(p_description, '')), '');
 begin
   if v_uid is null then raise exception 'not_authenticated'; end if;
+  if char_length(v_name) not between 1 and 80 then raise exception 'invalid_club_name'; end if;
+  if char_length(v_description) > 500 then raise exception 'invalid_description'; end if;
+
+  -- Serialize per user so concurrent calls can't slip past the cap.
+  perform pg_advisory_xact_lock(hashtextextended(v_uid::text, 0));
+  if (select count(*) from public.club_members where user_id = v_uid and role = 'owner') >= 10 then
+    raise exception 'club_limit_reached';
+  end if;
 
   insert into public.clubs (name, description, created_by)
-  values (btrim(p_name), nullif(btrim(coalesce(p_description, '')), ''), v_uid)
+  values (v_name, v_description, v_uid)
   returning id into v_club;
 
   insert into public.club_members (club_id, user_id, role) values (v_club, v_uid, 'owner');
@@ -455,6 +489,10 @@ alter default privileges in schema public revoke execute on functions from publi
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('avatars', 'avatars', true, 2097152, array['image/jpeg', 'image/png', 'image/webp'])
 on conflict (id) do nothing;
+
+create policy "avatars: users read their own folder" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid())::text);
 
 create policy "avatars: users write their own folder" on storage.objects
   for insert to authenticated
