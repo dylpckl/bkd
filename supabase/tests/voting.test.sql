@@ -111,6 +111,8 @@ select pg_temp.as_user('00000000-0000-0000-0000-0000000000b2');
 update t set n_cal = public.nominate(round_id, '30000000-0000-0000-0000-000000000003');
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000b1');
 select lives_ok($$ select public.remove_nomination((select n_cal from t)) $$, 'admin removes a nomination');
+-- Users can't read the nominations table itself (anonymity), so check as postgres.
+select pg_temp.as_role('postgres');
 select is((select count(*)::int from public.nominations where id = (select n_cal from t)), 0, 'the nomination is gone');
 select pg_temp.as_role('service_role');
 select public.claim_round_close((select round_id from t), true);
