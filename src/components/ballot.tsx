@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
   KeyboardSensor,
@@ -26,10 +26,13 @@ import { BookCover } from '#/components/book-cover'
 import { authorLine } from '#/lib/books'
 import { cn } from '#/lib/utils'
 import { getSupabaseBrowserClient } from '#/lib/supabase/browser'
-import { must } from '#/lib/errors'
+import { isTransientError, must } from '#/lib/errors'
+import { createSaveQueue } from '#/lib/save-queue'
+import type { SaveState } from '#/lib/save-queue'
+import { seededOrder } from '#/lib/shuffle'
 import type { Nomination } from '#/lib/queries'
 
-export type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+export type { SaveState }
 
 type Ballot = { firstCastAt: string; ranking: string[] } | null
 
@@ -39,6 +42,7 @@ type Ballot = { firstCastAt: string; ranking: string[] } | null
  */
 export function useBallot(
   roundId: string,
+  userId: string,
   nominations: Nomination[],
   ballot: Ballot,
 ) {
@@ -52,7 +56,13 @@ export function useBallot(
   const initialOrder = () => {
     const ids = new Set(rankable.map((n) => n.id))
     const ranked = (ballot?.ranking ?? []).filter((id) => ids.has(id))
-    const rest = rankable.map((n) => n.id).filter((id) => !ranked.includes(id))
+    // Books you haven't ranked start in an order that's fixed for you and this
+    // vote but differs between people, so the first move doesn't cast a ballot
+    // that favors whatever was nominated first.
+    const rest = seededOrder(
+      rankable.map((n) => n.id).filter((id) => !ranked.includes(id)),
+      `${userId}:${roundId}`,
+    )
     return [...ranked, ...rest]
   }
   const [order, setOrder] = useState<string[]>(initialOrder)
@@ -60,7 +70,6 @@ export function useBallot(
   const [saveState, setSaveState] = useState<SaveState>(
     hasVoted ? 'saved' : 'idle',
   )
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // Nominations come and go while the page is open: keep the order, drop removed
   // books, and add new ones at the bottom.
@@ -75,54 +84,38 @@ export function useBallot(
     })
   }, [rankable])
 
-  const save = useMutation({
-    mutationFn: (ids: string[]) =>
-      must(
-        getSupabaseBrowserClient().rpc('save_ballot', {
-          p_round_id: roundId,
-          p_nomination_ids: ids,
-        }),
-      ),
-    retry: 2,
-    onMutate: () => setSaveState('saving'),
-    onSuccess: () => {
-      setSaveState('saved')
-      void queryClient.invalidateQueries({
-        queryKey: ['round', roundId, 'vote-status'],
-      })
-      void queryClient.invalidateQueries({
-        queryKey: ['round', roundId, 'ballot'],
-      })
-    },
-    onError: () => setSaveState('error'),
-  })
-
-  // The order waiting out the debounce, so leaving the page can still save it.
-  const pending = useRef<string[] | null>(null)
+  // One save in flight at a time, always carrying the latest order; "Saved"
+  // only shows once nothing newer is waiting.
+  const queue = useMemo(
+    () =>
+      createSaveQueue<string[]>({
+        save: (ids) =>
+          must(
+            getSupabaseBrowserClient().rpc('save_ballot', {
+              p_round_id: roundId,
+              p_nomination_ids: ids,
+            }),
+          ),
+        onState: setSaveState,
+        onSaved: () => {
+          void queryClient.invalidateQueries({
+            queryKey: ['round', roundId, 'vote-status'],
+          })
+          void queryClient.invalidateQueries({
+            queryKey: ['round', roundId, 'ballot'],
+          })
+        },
+        shouldRetry: isTransientError,
+      }),
+    [roundId, queryClient],
+  )
   const commit = (next: string[]) => {
     setOrder(next)
     setVoted(true)
-    setSaveState('saving')
-    clearTimeout(timer.current)
-    pending.current = next
-    timer.current = setTimeout(() => {
-      pending.current = null
-      save.mutate(next)
-    }, 600)
+    queue.submit(next)
   }
-  useEffect(
-    () => () => {
-      clearTimeout(timer.current)
-      if (!pending.current) return
-      const ids = pending.current
-      void getSupabaseBrowserClient()
-        .rpc('save_ballot', { p_round_id: roundId, p_nomination_ids: ids })
-        .then(() =>
-          queryClient.invalidateQueries({ queryKey: ['round', roundId] }),
-        )
-    },
-    [roundId, queryClient],
-  )
+  // Leaving the page sends what's still waiting out the debounce.
+  useEffect(() => () => queue.flush(), [queue])
 
   const firstCastAt = ballot?.firstCastAt ?? null
   const isNew = (n: Nomination) =>
@@ -142,7 +135,10 @@ export function useBallot(
     saveState,
     isNew,
     commit,
-    retry: () => save.mutate(order),
+    retry: () => {
+      queue.submit(order)
+      queue.flush()
+    },
   }
 }
 

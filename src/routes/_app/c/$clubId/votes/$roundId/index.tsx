@@ -351,6 +351,7 @@ function OpenBallot({
   const { data: ballot } = useSuspenseQuery(myBallotQuery(round.id, userId))
   const { rows, voted, saveState, isNew, commit } = useBallot(
     round.id,
+    userId,
     nominations,
     ballot,
   )

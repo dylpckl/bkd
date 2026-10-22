@@ -1,7 +1,7 @@
 -- Ballots, managing a vote, closing and results.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(31);
+select plan(37);
 
 insert into auth.users (id, email, raw_user_meta_data, aud, role) values
   ('00000000-0000-0000-0000-0000000000b1', 'v-admin@test.dev', '{"display_name":"Ava"}', 'authenticated', 'authenticated'),
@@ -87,6 +87,13 @@ select pg_temp.as_role('service_role');
 select is(public.claim_round_close((select round_id from t), false), null, 'not overdue: no claim without early');
 select isnt(public.claim_round_close((select round_id from t), true), null, 'early claim succeeds');
 select is(public.claim_round_close((select round_id from t), true), null, 'second claim is a no-op');
+-- A claim that never finalized: the cron waits 5 minutes, an admin's early close only 1.
+select pg_temp.as_role('postgres');
+update public.rounds set close_claimed_at = now() - interval '2 minutes' where id = (select round_id from t);
+select pg_temp.as_role('service_role');
+select is(public.claim_round_close((select round_id from t), false), null, 'cron leaves a 2 minute old claim alone');
+select isnt(public.claim_round_close((select round_id from t), true), null, 'early close retakes a stale claim');
+select is((select close_attempts from public.rounds where id = (select round_id from t)), 2, 'claim attempts are counted');
 update t set club_book = public.finalize_round(round_id, jsonb_build_object('method', 'irv', 'winner', n_admin, 'seed', 'x'));
 select is(public.finalize_round((select round_id from t), jsonb_build_object('method', 'irv', 'winner', (select n_admin from t), 'seed', 'x')),
   (select club_book from t), 'finalize is idempotent');
@@ -99,9 +106,17 @@ select pg_temp.as_user('00000000-0000-0000-0000-0000000000b1');
 update t set round_id = public.start_round(club_id, current_date + 3, 'UTC');
 select is((select number from public.rounds where id = (select round_id from t)), 2, 'next vote is Book 2');
 update t set n_admin = public.nominate(round_id, '30000000-0000-0000-0000-000000000002');
+-- Admins can remove a nomination while the vote is open.
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000b2');
+update t set n_cal = public.nominate(round_id, '30000000-0000-0000-0000-000000000003');
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000b1');
+select lives_ok($$ select public.remove_nomination((select n_cal from t)) $$, 'admin removes a nomination');
+select is((select count(*)::int from public.nominations where id = (select n_cal from t)), 0, 'the nomination is gone');
 select pg_temp.as_role('service_role');
 select public.claim_round_close((select round_id from t), true);
 select public.finalize_round((select round_id from t), jsonb_build_object('method', 'single', 'winner', (select n_admin from t), 'seed', 'y'));
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000b1');
+select throws_ok($$ select public.remove_nomination((select n_admin from t)) $$, 'round_not_open', 'no removing nominations once the vote has closed');
 select results_eq($$ select number, status::text from public.club_books where club_id = (select club_id from t) order by number $$,
   $$ values (1, 'finished'), (2, 'reading') $$, 'Book 1 finished when Book 2 was picked');
 

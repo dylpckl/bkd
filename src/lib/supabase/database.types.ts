@@ -460,6 +460,7 @@ export type Database = {
       rounds: {
         Row: {
           anonymous_nominators: boolean
+          close_attempts: number
           close_claimed_at: string | null
           closed_at: string | null
           club_id: string
@@ -477,6 +478,7 @@ export type Database = {
         ComputedFields: never
         Insert: {
           anonymous_nominators?: boolean
+          close_attempts?: number
           close_claimed_at?: string | null
           closed_at?: string | null
           club_id: string
@@ -493,6 +495,7 @@ export type Database = {
         }
         Update: {
           anonymous_nominators?: boolean
+          close_attempts?: number
           close_claimed_at?: string | null
           closed_at?: string | null
           club_id?: string
