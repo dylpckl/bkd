@@ -186,7 +186,7 @@ function OpenVoteCard({
       <p className="text-muted-foreground flex items-center gap-1.5 text-[13px]">
         <Clock className="size-4" aria-hidden />
         Closes end of {formatDeadline(round.deadline, round.timezone)} —{' '}
-        {daysLeftLabel(round.deadline).toLowerCase()}
+        {daysLeftLabel(round.deadline, round.timezone).toLowerCase()}
       </p>
       <div className="grid grid-cols-2 gap-2">
         <div className="bg-background flex flex-col rounded-lg px-3 py-2.5">
