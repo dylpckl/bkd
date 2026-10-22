@@ -77,12 +77,15 @@ create policy "posts: members write their own" on public.posts
 
 create policy "posts: authors edit" on public.posts
   for update to authenticated
-  using (author_id = (select auth.uid()))
-  with check (author_id = (select auth.uid()));
+  using (author_id = (select auth.uid()) and public.is_club_member(public.club_book_club(club_book_id)))
+  with check (author_id = (select auth.uid()) and public.is_club_member(public.club_book_club(club_book_id)));
 
 create policy "posts: authors and admins delete" on public.posts
   for delete to authenticated
-  using (author_id = (select auth.uid()) or public.is_club_admin(public.club_book_club(club_book_id)));
+  using (
+    (author_id = (select auth.uid()) and public.is_club_member(public.club_book_club(club_book_id)))
+    or public.is_club_admin(public.club_book_club(club_book_id))
+  );
 
 -- ---------------------------------------------------------------------------
 -- Reviews. Rating is half-stars, 1–10 (9 = 4.5 stars). Posting one marks you
@@ -95,7 +98,10 @@ create table public.reviews (
   user_id uuid not null references public.profiles (id) on delete cascade,
   rating smallint not null check (rating between 1 and 10),
   body text check (body is null or char_length(body) <= 10000),
-  goodreads_url text check (goodreads_url is null or goodreads_url ~* '^https://(www\.)?goodreads\.com/'),
+  goodreads_url text check (
+    goodreads_url is null
+    or (char_length(goodreads_url) <= 500 and goodreads_url ~* '^https://(www\.)?goodreads\.com/')
+  ),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (club_book_id, user_id)
@@ -158,6 +164,7 @@ begin
      and btrim(p_goodreads_url) !~* '^https://(www\.)?goodreads\.com/' then
     raise exception 'invalid_goodreads_url';
   end if;
+  if char_length(btrim(coalesce(p_goodreads_url, ''))) > 500 then raise exception 'invalid_goodreads_url'; end if;
 
   insert into public.reviews (club_book_id, user_id, rating, body, goodreads_url)
   values (p_club_book_id, v_uid, p_rating, nullif(btrim(coalesce(p_body, '')), ''), nullif(btrim(coalesce(p_goodreads_url, '')), ''))
@@ -188,16 +195,18 @@ create trigger club_members_finish_books
   after delete on public.club_members
   for each row execute function public.on_member_left();
 
--- What every member may see about a book's reviews, even before finishing:
--- the average, the count, and who has finished. The rating breakdown only
--- once the caller's reviews are unlocked.
+-- What every member may see about a book's reviews before unlocking: only who
+-- has finished. The average, count and rating breakdown (any of which can give
+-- away a lone reviewer's rating) are null until the caller is unlocked.
 create function public.club_book_summary(p_club_book_id uuid)
 returns jsonb
 language sql stable security definer set search_path = ''
 as $$
   select case when public.is_club_member(cb.club_id) then jsonb_build_object(
-    'average', (select round(avg(r.rating) / 2.0, 1) from public.reviews r where r.club_book_id = cb.id),
-    'review_count', (select count(*) from public.reviews r where r.club_book_id = cb.id),
+    'average', case when coalesce(public.can_read_reviews(cb.id), false)
+      then (select round(avg(r.rating) / 2.0, 1) from public.reviews r where r.club_book_id = cb.id) end,
+    'review_count', case when coalesce(public.can_read_reviews(cb.id), false)
+      then (select count(*) from public.reviews r where r.club_book_id = cb.id) end,
     'member_count', (select count(*) from public.club_members m where m.club_id = cb.club_id),
     -- Current members only, so "4 of 6 finished" adds up after people leave.
     'finished_user_ids', coalesce((
@@ -238,6 +247,8 @@ revoke execute on function
   public.set_discussion_mode(uuid, public.discussion_mode)
 from public, anon, authenticated;
 
+-- club_book_club and can_read_reviews stay executable by authenticated: RLS
+-- policies on posts and reviews call them as the invoking role.
 grant execute on function
   public.club_book_club(uuid),
   public.can_read_reviews(uuid),

@@ -365,7 +365,7 @@ export type ClubBook = NonNullable<
 
 export type BookSummary = {
   average: number | null
-  review_count: number
+  review_count: number | null
   member_count: number
   finished_user_ids: string[]
   unlocked: boolean

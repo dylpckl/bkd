@@ -77,12 +77,12 @@ test('discuss, then reviews stay hidden until you post yours, and the book finis
     owner.getByText('You finished Piranesi · 4.5 stars'),
   ).toBeVisible()
 
-  // Priya hasn't finished: average and progress, but no review text.
+  // Priya hasn't finished: progress only. No average, breakdown or review text.
   await friend.getByRole('link', { name: 'Reviews' }).click()
   await expect(
     friend.getByRole('heading', { name: 'Finish the book to see the reviews' }),
   ).toBeVisible()
-  await expect(friend.getByText('4.5', { exact: true })).toBeVisible()
+  await expect(friend.getByText('4.5', { exact: true })).toHaveCount(0)
   await expect(friend.getByText('Quiet, strange and kind.')).toHaveCount(0)
 
   // Once she posts, both reviews show and the book is finished.
