@@ -1,7 +1,7 @@
 -- Posts, reviews, reveal rules and finishing.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(29);
+select plan(34);
 
 insert into auth.users (id, email, raw_user_meta_data, aud, role) values
   ('00000000-0000-0000-0000-0000000000c1', 'r-admin@test.dev', '{"display_name":"Rae"}', 'authenticated', 'authenticated'),
@@ -51,6 +51,19 @@ select pg_temp.as_user('00000000-0000-0000-0000-0000000000c3');
 select is_empty($$ select * from public.posts $$, 'outsiders cannot read posts');
 select throws_ok($$ insert into public.posts (club_book_id, body) select cb, 'hi' from t $$, '42501', null, 'outsiders cannot post');
 
+-- A removed member can no longer edit or delete their own post.
+select pg_temp.as_postgres();
+delete from public.club_members where user_id = '00000000-0000-0000-0000-0000000000c2';
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000c2');
+update public.posts set body = 'Ghost edit' where id = (select post from t);
+select pg_temp.as_postgres();
+select is((select body from public.posts where id = (select post from t)), 'Loved the tide tables.', 'a former member cannot edit their post');
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000c2');
+delete from public.posts where id = (select post from t);
+select pg_temp.as_postgres();
+select isnt((select count(*)::int from public.posts where id = (select post from t)), 0, 'a former member cannot delete their post');
+insert into public.club_members (club_id, user_id) select club_id, '00000000-0000-0000-0000-0000000000c2' from t;
+
 -- Admins can delete any post; deleting a post removes its replies.
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000c1');
 delete from public.posts where id = (select post from t);
@@ -60,17 +73,20 @@ select is((select count(*)::int from public.posts where club_book_id = (select c
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000c2');
 select throws_ok($$ select public.post_review((select cb from t), 11) $$, 'invalid_rating', 'rating is 1–10 half-stars');
 select throws_ok($$ select public.post_review((select cb from t), 8, null, 'https://evil.example/x') $$, 'invalid_goodreads_url', 'only Goodreads links');
+select throws_ok($$ select public.post_review((select cb from t), 8, null, 'https://www.goodreads.com/' || repeat('a', 500)) $$, 'invalid_goodreads_url', 'Goodreads links are capped at 500 characters');
 select lives_ok($$ select public.post_review((select cb from t), 9, ' Quiet and strange. ', 'https://www.goodreads.com/review/show/1') $$, 'Sam posts a review');
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000c1');
 select is_empty($$ select * from public.reviews $$, 'Rae cannot see reviews before posting hers');
-select is((public.club_book_summary((select cb from t)) ->> 'average')::numeric, 4.5, 'but the average is visible');
-select is((public.club_book_summary((select cb from t)) -> 'distribution'), 'null'::jsonb, 'the breakdown is not');
+select is((public.club_book_summary((select cb from t)) -> 'average'), 'null'::jsonb, 'the average is hidden while locked');
+select is((public.club_book_summary((select cb from t)) -> 'review_count'), 'null'::jsonb, 'so is the review count');
+select is((public.club_book_summary((select cb from t)) -> 'distribution'), 'null'::jsonb, 'and the breakdown');
 select is(jsonb_array_length(public.club_book_summary((select cb from t)) -> 'finished_user_ids'), 1, 'and who has finished');
 select is((select status::text from public.club_books where id = (select cb from t)), 'reading', 'still reading with one member left');
 
 select lives_ok($$ select public.post_review((select cb from t), 6) $$, 'Rae posts hers');
 select is((select count(*)::int from public.reviews), 2, 'now Rae sees both reviews');
 select is((select status::text from public.club_books where id = (select cb from t)), 'finished', 'everyone has reviewed, so the book is finished');
+select is((public.club_book_summary((select cb from t)) ->> 'review_count')::int, 2, 'unlocked members see the review count');
 select is((public.club_book_summary((select cb from t)) ->> 'average')::numeric, 3.8, 'average is to one decimal (7.5 half-stars = 3.75 → 3.8)');
 select lives_ok($$ select public.post_review((select cb from t), 7) $$, 'reviews can be edited');
 select is((select rating from public.reviews where user_id = auth.uid()), 7::smallint, 'edit updated the rating');

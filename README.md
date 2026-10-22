@@ -66,6 +66,7 @@ The app targets Vercel (`vercel.json`). For a hosted Supabase project:
    select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/close-round', 'close_round_url');
    select vault.create_secret('<service_role key>', 'close_round_key');
    ```
+   `close_round_key` must be the legacy `service_role` JWT, the same value as the function's `SUPABASE_SERVICE_ROLE_KEY`; the function compares the two and rejects anything else, including new-style `sb_secret_...` keys. If a vote isn't closing on time, check that the cron job reports success in `select * from cron.job_run_details order by start_time desc limit 10;` (a missing Vault secret shows as a failed run) and that the HTTP call went through in `select * from net._http_response order by created desc limit 10;`. Rounds whose close keeps failing log a warning in the Postgres logs; an admin can still close them early after a minute.
 2. In Supabase Auth, set the Site URL to the app origin and add redirect URLs for `<origin>/auth/callback**`. Keep "Confirm email" on.
 3. Set up Google OAuth: add the authorized origin, plus the redirect URI `https://<project>.supabase.co/auth/v1/callback`.
 4. Configure custom SMTP (Resend) before inviting real people.

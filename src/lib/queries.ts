@@ -189,7 +189,7 @@ export function avatarSrc(p: {
 
 export type Round = Omit<
   Database['public']['Tables']['rounds']['Row'],
-  'close_claimed_at'
+  'close_claimed_at' | 'close_attempts'
 >
 
 const ROUND_COLUMNS =
@@ -365,7 +365,7 @@ export type ClubBook = NonNullable<
 
 export type BookSummary = {
   average: number | null
-  review_count: number
+  review_count: number | null
   member_count: number
   finished_user_ids: string[]
   unlocked: boolean

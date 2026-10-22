@@ -163,7 +163,10 @@ as $$
 declare
   v_round public.rounds;
 begin
-  select r.* into v_round from public.rounds r join public.nominations n on n.round_id = r.id where n.id = p_nomination_id;
+  -- Lock the round row (as update_round/cancel_round do) so this can't interleave with a close
+  -- claiming the round: the status check below is then still true when the delete runs.
+  select r.* into v_round from public.rounds r join public.nominations n on n.round_id = r.id
+  where n.id = p_nomination_id for update of r;
   if v_round.id is null or not public.is_club_admin(v_round.club_id) then raise exception 'not_allowed'; end if;
   if v_round.status <> 'open' then raise exception 'round_not_open'; end if;
   delete from public.nominations where id = p_nomination_id;
@@ -225,13 +228,16 @@ create policy "round_results: members read" on public.round_results
   using (exists (select 1 from public.rounds r where r.id = round_id and public.is_club_member(r.club_id)));
 
 alter table public.rounds add column close_claimed_at timestamptz;
+-- How many times a close was claimed; more than once means an earlier attempt never finalized.
+alter table public.rounds add column close_attempts int not null default 0;
 
 -- ---------------------------------------------------------------------------
 -- Closing. The close-round edge function calls these with the service role:
 --   1. claim_round_close: open → closing, returns what IRV needs
 --   2. (runs IRV in TypeScript)
 --   3. finalize_round: writes results, the winner and the club book
--- Both are idempotent. A claim older than 5 minutes is assumed dead and can be retaken.
+-- Both are idempotent. A claim older than 5 minutes is assumed dead and can be retaken
+-- by the cron run; an admin's early close retakes one older than 1 minute.
 -- ---------------------------------------------------------------------------
 
 create function public.claim_round_close(p_round_id uuid, p_early boolean default false)
@@ -241,15 +247,21 @@ as $$
 declare
   v_round public.rounds;
 begin
-  update public.rounds set status = 'closing', close_claimed_at = now()
+  update public.rounds set status = 'closing', close_claimed_at = now(), close_attempts = close_attempts + 1
   where id = p_round_id
     and (
       (status = 'open' and (p_early or deadline <= now()))
-      or (status = 'closing' and close_claimed_at < now() - interval '5 minutes')
+      or (status = 'closing' and close_claimed_at < now() - (case when p_early then interval '1 minute' else interval '5 minutes' end))
     )
   returning * into v_round;
 
   if v_round.id is null then return null; end if;
+
+  -- Visible in the Postgres logs: finalizing keeps failing for this round.
+  if v_round.close_attempts > 1 then
+    raise warning 'round % close claimed % times without finalizing; check the close-round function logs',
+      v_round.id, v_round.close_attempts;
+  end if;
 
   return jsonb_build_object(
     'round_id', v_round.id,
@@ -336,7 +348,8 @@ as $$
 $$;
 
 -- pg_cron → close-round. The URL and service key live in Vault (names below) so
--- they never appear in migrations; with either missing this does nothing.
+-- they never appear in migrations. With either missing (and a round due) this raises, so the
+-- cron run shows as failed in cron.job_run_details instead of passing silently.
 create function public.request_round_closes()
 returns void
 language plpgsql security definer set search_path = ''
@@ -349,8 +362,7 @@ begin
   select decrypted_secret into v_url from vault.decrypted_secrets where name = 'close_round_url';
   select decrypted_secret into v_key from vault.decrypted_secrets where name = 'close_round_key';
   if v_url is null or v_key is null then
-    raise warning 'close-round not configured: add close_round_url and close_round_key to Vault';
-    return;
+    raise exception 'close-round is not configured: add close_round_url and close_round_key to Vault (rounds are waiting to close)';
   end if;
   perform net.http_post(
     url := v_url,

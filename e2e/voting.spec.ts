@@ -34,6 +34,17 @@ const ballotTitles = (page: Page) =>
     .locator('strong')
     .allTextContents()
 
+// Moves a book to the top of the ballot by keyboard. The default order is shuffled per person,
+// so find where it is first; a book already on top gets a down-and-up so the move still counts.
+async function moveToTop(page: Page, title: string) {
+  const index = (await ballotTitles(page)).indexOf(title)
+  expect(index).toBeGreaterThanOrEqual(0)
+  await page.getByRole('button', { name: `Reorder ${title}, ranked` }).focus()
+  const moves =
+    index === 0 ? ['ArrowDown', 'ArrowUp'] : Array(index).fill('ArrowUp')
+  await keys(page, 'Space', ...moves, 'Space')
+}
+
 test('members rank by keyboard, the ballot autosaves, and closing early shows the results', async ({
   browser,
 }) => {
@@ -67,23 +78,24 @@ test('members rank by keyboard, the ballot autosaves, and closing early shows th
   await adam.goto(voteUrl)
   await nominate(adam, 'circe', /Circe/)
 
-  // Adam's ballot has everyone else's books, in nomination order, not yet a vote.
+  // Adam's ballot has everyone else's books, in a per-person default order, not yet a vote.
   await adam.reload()
-  expect(await ballotTitles(adam)).toEqual(['Piranesi', 'Project Hail Mary'])
+  expect((await ballotTitles(adam)).sort()).toEqual([
+    'Piranesi',
+    'Project Hail Mary',
+  ])
   await expect(adam.getByText('Your first move casts your vote.')).toBeVisible()
   await expect(adam.getByText('✓ Saved')).toHaveCount(0)
 
-  // Move Hail Mary to the top with the keyboard.
-  await adam.getByRole('button', { name: /Reorder Project Hail Mary/ }).focus()
-  await keys(adam, 'Space', 'ArrowUp', 'Space')
+  // Move Hail Mary to the top with the keyboard; the order survives a reload.
+  await moveToTop(adam, 'Project Hail Mary')
   await expect(adam.getByText('✓ Saved')).toBeVisible()
   await adam.reload()
   expect(await ballotTitles(adam)).toEqual(['Project Hail Mary', 'Piranesi'])
 
   // Jimmy votes Piranesi first; the owner votes Hail Mary first by keeping a drop in place.
   await jimmy.reload()
-  await jimmy.getByRole('button', { name: /Reorder Piranesi/ }).focus()
-  await keys(jimmy, 'Space', 'ArrowDown', 'ArrowUp', 'Space')
+  await moveToTop(jimmy, 'Piranesi')
   await expect(jimmy.getByText('✓ Saved')).toBeVisible()
 
   // The owner sees who has voted and closes early.

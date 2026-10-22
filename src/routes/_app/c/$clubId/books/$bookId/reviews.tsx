@@ -188,7 +188,11 @@ function SummaryCard({ summary }: { summary: BookSummary }) {
         </span>
         <StarDisplay value={summary.average ?? 0} size={14} />
         <span className="text-muted-foreground text-[13px]">
-          {summary.average === null ? 'no reviews yet' : 'club avg'}
+          {!summary.unlocked
+            ? 'locked'
+            : summary.average === null
+              ? 'no reviews yet'
+              : 'club avg'}
         </span>
       </div>
       <div className="flex flex-1 flex-col gap-1.5">

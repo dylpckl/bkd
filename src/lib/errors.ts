@@ -34,6 +34,17 @@ export function errorMessage(
   return fallback
 }
 
+/**
+ * True for failures that may pass on their own (network drop, gateway or
+ * timeout errors). Errors from our own rules (`round_not_open`, `not_allowed`)
+ * carry a Postgres code and fail the same way every time.
+ */
+export function isTransientError(error: unknown) {
+  const code = (error as { code?: string } | null)?.code
+  if (!code) return true
+  return /^(08|53|57|PGRST00[0-3])/.test(code)
+}
+
 /** Awaits a Supabase call and throws its error, so it can be used with useMutation. */
 export async function must<T>(
   request: PromiseLike<{ data: T; error: unknown }>,

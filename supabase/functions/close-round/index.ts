@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    if (isServiceCall(authorization)) {
+    if (await isServiceCall(authorization)) {
       const { data: due, error } = await asService.rpc<string[]>(
         'rounds_due_for_close',
         {},
