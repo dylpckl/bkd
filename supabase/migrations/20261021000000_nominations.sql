@@ -23,8 +23,8 @@ create table public.books (
 );
 
 alter table public.books enable row level security;
-revoke all on public.books from anon;
-revoke insert, update, delete on public.books from authenticated;
+revoke all on public.books from anon, authenticated;
+grant select on public.books to authenticated;
 
 create policy "books: signed-in users read" on public.books
   for select to authenticated using (true);
@@ -82,15 +82,15 @@ alter table public.rounds
 
 alter table public.rounds enable row level security;
 alter table public.nominations enable row level security;
-revoke all on public.rounds, public.nominations from anon;
-revoke insert, update, delete on public.rounds from authenticated;
-revoke all on public.nominations from authenticated;
+revoke all on public.rounds, public.nominations from anon, authenticated;
+grant select on public.rounds to authenticated;
 
 create policy "rounds: members read" on public.rounds
   for select to authenticated using (public.is_club_member(club_id));
 
 -- Owned by postgres, so it reads nominations past RLS; membership is checked here.
--- While a vote is open and anonymous, nominated_by is null except on your own rows.
+-- On an anonymous round, nominated_by is null except on your own rows until the
+-- round is closed (open, closing and cancelled rounds all stay hidden).
 create view public.nominations_public
 with (security_invoker = false, security_barrier = true)
 as
@@ -100,7 +100,7 @@ select
   r.club_id,
   n.book_id,
   case
-    when r.anonymous_nominators and r.status in ('open', 'closing') and n.nominated_by <> (select auth.uid())
+    when r.anonymous_nominators and r.status <> 'closed' and n.nominated_by <> (select auth.uid())
       then null
     else n.nominated_by
   end as nominated_by,
@@ -129,7 +129,7 @@ declare
 begin
   -- Lock the round so concurrent nominations can't both slip under the limit.
   select * into v_round from public.rounds where id = new.round_id for update;
-  if v_round.status <> 'open' or v_round.deadline <= now() then
+  if not found or v_round.status <> 'open' or v_round.deadline <= now() then
     raise exception 'round_not_open';
   end if;
 
@@ -192,6 +192,10 @@ declare
   v_id uuid;
 begin
   if not public.is_club_admin(p_club_id) then raise exception 'not_allowed'; end if;
+  if p_max_nominations is not null and p_max_nominations not between 1 and 5 then
+    raise exception 'invalid_input';
+  end if;
+  if p_note is not null and char_length(p_note) > 500 then raise exception 'invalid_input'; end if;
   if not exists (select 1 from pg_catalog.pg_timezone_names where name = p_timezone) then
     raise exception 'invalid_timezone';
   end if;
@@ -244,6 +248,7 @@ declare
 begin
   select club_id into v_club from public.rounds where id = p_round_id;
   if v_club is null or not public.is_club_member(v_club) then raise exception 'not_allowed'; end if;
+  if p_pitch is not null and char_length(p_pitch) > 280 then raise exception 'invalid_input'; end if;
 
   if p_replace_id is not null then
     delete from public.nominations
@@ -267,6 +272,7 @@ returns void
 language plpgsql security definer set search_path = ''
 as $$
 begin
+  if p_pitch is not null and char_length(p_pitch) > 280 then raise exception 'invalid_input'; end if;
   update public.nominations
   set pitch = nullif(btrim(coalesce(p_pitch, '')), '')
   where id = p_nomination_id and nominated_by = (select auth.uid());

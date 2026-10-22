@@ -42,7 +42,10 @@ export function safeNext(next: unknown, fallback = '/clubs'): string {
   try {
     const url = new URL(next, PROBE_ORIGIN)
     if (url.origin !== PROBE_ORIGIN) return fallback
-    return url.pathname + url.search + url.hash
+    const result = url.pathname + url.search + url.hash
+    // Dot segments can collapse to a protocol-relative '//host' (e.g. '/.//evil.test').
+    if (result.startsWith('//') || result.startsWith('/\\')) return fallback
+    return result
   } catch {
     return fallback
   }

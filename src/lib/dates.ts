@@ -1,5 +1,3 @@
-const DAY = 86_400_000
-
 // Deadlines are 11:59 PM on a date in the timezone of the admin who set them, so
 // they're shown in that timezone: everyone sees the date the admin picked.
 const fmt = (opts: Intl.DateTimeFormatOptions, timeZone?: string) =>
@@ -13,29 +11,52 @@ export function formatDeadline(iso: string, timeZone?: string) {
   ).format(new Date(iso))
 }
 
+// en-CA formats as yyyy-mm-dd.
 const dayKey = (d: Date, timeZone?: string) =>
-  fmt({ year: 'numeric', month: '2-digit', day: '2-digit' }, timeZone).format(d)
+  new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone,
+  }).format(d)
 
-/** Whole days left, counting a partial day as one. 0 once it has passed. */
-export function daysLeft(iso: string, now = new Date()) {
-  const ms = new Date(iso).getTime() - now.getTime()
-  return ms <= 0 ? 0 : Math.ceil(ms / DAY)
+/** Calendar days between two instants as seen in `timeZone` (DST-safe). */
+function calendarDays(from: Date, to: Date, timeZone?: string) {
+  const ymd = (d: Date) => {
+    const [y, m, day] = dayKey(d, timeZone).split('-').map(Number)
+    return Date.UTC(y, m - 1, day)
+  }
+  return Math.round((ymd(to) - ymd(from)) / 86_400_000)
+}
+
+/**
+ * Calendar days left in the round's timezone, counting today: 1 on the deadline
+ * day ("Last day"), 0 once the deadline has passed.
+ */
+export function daysLeft(iso: string, timeZone?: string, now = new Date()) {
+  const end = new Date(iso)
+  if (end.getTime() <= now.getTime()) return 0
+  return calendarDays(now, end, timeZone) + 1
 }
 
 /** "closes Fri" this week, "closes Oct 30" further out, "closes today" on the day. */
 export function closesShort(iso: string, timeZone?: string, now = new Date()) {
-  const left = daysLeft(iso, now)
+  const left = daysLeft(iso, timeZone, now)
   if (left === 0) return 'closed'
   const d = new Date(iso)
-  if (dayKey(d, timeZone) === dayKey(now, timeZone)) return 'closes today'
-  if (left <= 6)
+  if (left === 1) return 'closes today'
+  if (left <= 7)
     return `closes ${fmt({ weekday: 'short' }, timeZone).format(d)}`
   return `closes ${fmt({ month: 'short', day: 'numeric' }, timeZone).format(d)}`
 }
 
 /** "3 days left", "1 day left", "Last day". */
-export function daysLeftLabel(iso: string, now = new Date()) {
-  const left = daysLeft(iso, now)
+export function daysLeftLabel(
+  iso: string,
+  timeZone?: string,
+  now = new Date(),
+) {
+  const left = daysLeft(iso, timeZone, now)
   // Between the deadline and the close job running (up to 5 minutes).
   if (left === 0) return 'Voting closed'
   if (left === 1) return 'Last day'
