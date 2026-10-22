@@ -189,7 +189,7 @@ export function avatarSrc(p: {
 
 export type Round = Omit<
   Database['public']['Tables']['rounds']['Row'],
-  'close_claimed_at'
+  'close_claimed_at' | 'close_attempts'
 >
 
 const ROUND_COLUMNS =
