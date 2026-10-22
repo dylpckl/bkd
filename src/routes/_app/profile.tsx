@@ -209,7 +209,10 @@ function ProfilePage() {
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="bg-card flex flex-col-reverse rounded-xl border px-3 py-2.5">
+    <div
+      data-testid="stat"
+      className="bg-card flex flex-col-reverse rounded-xl border px-3 py-2.5"
+    >
       <dt className="text-muted-foreground text-[13px]">{label}</dt>
       <dd className="text-[clamp(16px,5.2vw,20px)] font-bold whitespace-nowrap">
         {value}
@@ -233,27 +236,42 @@ function AvatarPicker({
   const queryClient = useQueryClient()
   const input = useRef<HTMLInputElement>(null)
 
+  /** Points the profile at `next` (or nothing), then deletes the file it replaced. */
   const setPath = async (next: string | null) => {
     const supabase = getSupabaseBrowserClient()
     await must(
       supabase.from('profiles').update({ avatar_path: next }).eq('id', userId),
     )
-    // The old file is no longer referenced; failing to delete it only wastes space.
-    if (path) await supabase.storage.from('avatars').remove([path])
+    if (path) {
+      // The profile has already moved on, so a failure here only leaves an
+      // unreferenced file behind: log it rather than fail the change.
+      const { error } = await supabase.storage.from('avatars').remove([path])
+      if (error) console.error('Could not delete the old avatar', error)
+    }
   }
 
   const upload = useMutation({
     mutationFn: async (file: File) => {
+      const supabase = getSupabaseBrowserClient()
       const blob = await resizeAvatar(file)
       const next = `${userId}/${Date.now()}.jpg`
-      const { error } = await getSupabaseBrowserClient()
-        .storage.from('avatars')
+      const { error } = await supabase.storage
+        .from('avatars')
         .upload(next, blob, { contentType: 'image/jpeg' })
       if (error) throw error
-      await setPath(next)
+      try {
+        await setPath(next)
+      } catch (e) {
+        // The profile still points at the old photo: drop the new, orphaned file.
+        const { error: cleanup } = await supabase.storage
+          .from('avatars')
+          .remove([next])
+        if (cleanup) console.error('Could not clean up the new avatar', cleanup)
+        throw e
+      }
     },
     onSuccess: () => refresh(),
-    onError: () => toast.error('Couldn’t use that photo. Try a JPEG or PNG.'),
+    onError: () => toast.error('Couldn�t use that photo. Try a JPEG or PNG.'),
   })
   const remove = useMutation({
     mutationFn: () => setPath(null),

@@ -87,7 +87,10 @@ function HistoryPage() {
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="bg-card flex flex-col-reverse rounded-xl border px-3 py-2.5">
+    <div
+      data-testid="stat"
+      className="bg-card flex flex-col-reverse rounded-xl border px-3 py-2.5"
+    >
       <dt className="text-muted-foreground text-[13px]">{label}</dt>
       <dd className="text-[clamp(16px,5.2vw,20px)] font-bold whitespace-nowrap">
         {value}

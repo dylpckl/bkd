@@ -1,7 +1,7 @@
 -- Club history, Needs you and profile stats.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(13);
+select plan(19);
 
 insert into auth.users (id, email, raw_user_meta_data, aud, role) values
   ('00000000-0000-0000-0000-0000000000d1', 'h-admin@test.dev', '{"display_name":"Uma"}', 'authenticated', 'authenticated'),
@@ -47,6 +47,10 @@ select is((select array_agg(title order by number desc) from public.club_history
   array['Hyperion', 'Circe'], 'members see every club book, newest first');
 select is((select average from public.club_history((select club_id from t)) where number = 1), 4.0, 'with the average rating');
 
+-- Strict reveal: the book being read hides its rating until Vic posts a review.
+select is((select average from public.club_history((select club_id from t)) where number = 2), null, 'no average on the book being read before you review it');
+select is((select review_count from public.club_history((select club_id from t)) where number = 2), null, 'and no review count');
+
 -- Needs you: the book being read needs a review from both members.
 select is((select count(*)::int from public.needs_you() where kind = 'review'), 1, 'Vic has a review to post');
 select is((select book_title from public.needs_you() where kind = 'review'), 'Hyperion', 'for the book being read');
@@ -63,12 +67,16 @@ select public.save_ballot((select round_id from t), array(select id from public.
 select is((select count(*)::int from public.needs_you() where kind = 'vote'), 0, 'and not once it is cast');
 select public.post_review((select reading from t), 9);
 select is((select count(*)::int from public.needs_you() where kind = 'review'), 0, 'or once the review is posted');
+select is((select average from public.club_history((select club_id from t)) where number = 2), 4.5, 'posting your review unlocks the average');
+select is((select review_count from public.club_history((select club_id from t)) where number = 2), 1, 'and the review count');
 
 -- Profile stats.
 select is((select books_read from public.profile_stats()), 2, 'Vic has read both books');
 select is((select average from public.profile_stats()), 4.3, 'Vic averages 4.25 stars, shown as 4.3');
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000d1');
-select is((select books_read from public.profile_stats()), 1, 'Uma read the finished book as a member, without reviewing it');
+select is((select average from public.club_history((select club_id from t)) where number = 2), null, 'Uma has not reviewed the book being read: still locked');
+select is((select average from public.club_history((select club_id from t)) where number = 1), 4.0, 'but the finished book shows its average without a review');
+select is((select books_read from public.profile_stats()), 0, 'Uma was a member for the finished book but never reviewed it, so has not read it');
 
 select * from finish();
 rollback;

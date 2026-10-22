@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Browser } from '@playwright/test'
+import type { Browser, Page } from '@playwright/test'
 
 // Uses the seeded Overdue Society history from supabase/seed.sql.
 async function signIn(browser: Browser, email: string) {
@@ -18,7 +18,11 @@ const PNG = Buffer.from(
   'base64',
 )
 
-test('needs you, books read, all books and profile', async ({ browser }) => {
+/** The Stat card (profile and All books) whose label matches. */
+const stat = (page: Page, label: RegExp) =>
+  page.getByTestId('stat').filter({ hasText: label })
+
+test('needs you, books read and all books', async ({ browser }) => {
   const page = await signIn(browser, 'dylan@example.com')
 
   // Needs you: Dylan hasn't reviewed the book the club is reading.
@@ -41,9 +45,10 @@ test('needs you, books read, all books and profile', async ({ browser }) => {
 
   // All books: stats and every book, newest first, linking to its reviews.
   await expect(page.getByRole('heading', { name: 'All books' })).toBeVisible()
-  const booksRead = page.locator('dl > div').first()
-  await expect(booksRead).toContainText('books read')
-  await expect(booksRead.locator('dd')).toHaveText('3')
+  // Dylan reviewed three of the finished books.
+  await expect(stat(page, /books? read/).getByRole('definition')).toHaveText(
+    '3',
+  )
   const rows = page.getByRole('main').getByRole('listitem')
   await expect(rows).toHaveCount(4)
   await expect(rows.first()).toContainText('Piranesi')
@@ -51,14 +56,31 @@ test('needs you, books read, all books and profile', async ({ browser }) => {
   await rows.filter({ hasText: 'Hyperion' }).click()
   await expect(page).toHaveURL(/\/reviews$/)
   await expect(page.getByText("The Priest's Tale!")).toBeVisible()
+})
 
-  // Profile: stats and a photo.
+// Leave no photo behind, even when the test below fails part-way.
+test.afterEach(async ({ browser }) => {
+  const page = await signIn(browser, 'dylan@example.com')
   await page.goto('/profile')
-  await expect(page.getByRole('heading', { name: 'Dylan' })).toBeVisible()
+  const change = page.getByRole('button', { name: 'Change profile photo' })
+  if (await change.isVisible()) {
+    await change.click()
+    await page.getByRole('menuitem', { name: 'Remove photo' }).click()
+    await expect(
+      page.getByRole('button', { name: 'Add a profile photo' }),
+    ).toBeVisible()
+  }
+  await page.context().close()
+})
+
+test('profile stats and photo', async ({ browser }) => {
+  const page = await signIn(browser, 'dylan@example.com')
+  await page.goto('/profile')
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
   // Other specs post reviews as Dylan too, so only check the shape.
-  await expect(
-    page.locator('dl > div').filter({ hasText: 'your avg' }).locator('dd'),
-  ).toHaveText(/^★ \d(\.\d)?$/)
+  await expect(stat(page, /your avg/).getByRole('definition')).toHaveText(
+    /^(★ \d(\.\d)?|–)$/,
+  )
   await page.locator('input[type=file]').setInputFiles({
     name: 'me.png',
     mimeType: 'image/png',

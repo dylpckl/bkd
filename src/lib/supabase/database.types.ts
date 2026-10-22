@@ -704,7 +704,7 @@ export type Database = {
         Args: { p_club_id: string }
         Returns: {
           authors: string[]
-          average: number
+          average: number | null
           count_rounds: number
           cover_url: string
           finished_at: string
@@ -713,7 +713,7 @@ export type Database = {
           nominee_count: number
           number: number
           pick_method: string
-          review_count: number
+          review_count: number | null
           round_id: string
           started_at: string
           status: Database['public']['Enums']['club_book_status']
