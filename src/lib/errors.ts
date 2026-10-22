@@ -7,6 +7,11 @@ const MESSAGES: Record<string, string> = {
   use_leave_club: 'Use "Leave club" to remove yourself.',
   already_owner: "You're already the owner.",
   invalid_expiry: 'Pick an expiry date in the future.',
+  invalid_club_name: 'Club names need 1 to 80 characters.',
+  invalid_description: 'Descriptions can be up to 500 characters.',
+  club_limit_reached: "You've reached the limit of 10 clubs you can own.",
+  owner_has_clubs:
+    'Transfer or delete your clubs before deleting your account.',
   invalid_max_uses: 'Max people must be a number from 1 to 500.',
   round_not_open: 'Voting for this book has closed.',
   round_already_open: 'There’s already a vote open in this club.',
@@ -21,6 +26,11 @@ const MESSAGES: Record<string, string> = {
     'Anonymous voting can’t be turned off once people have nominated.',
   search_unavailable:
     'Book search isn’t available right now. Try again in a minute.',
+  search_not_configured:
+    'Book search isn�t set up yet. Ask the app owner to finish setup.',
+  rate_limited: 'Too many searches. Wait a moment and try again.',
+  bad_request: 'That request wasn�t valid. Check your input and try again.',
+  invalid_input: 'That request wasn�t valid. Check your input and try again.',
   book_not_found: 'That book couldn’t be found. Try another result.',
 }
 

@@ -1,7 +1,7 @@
 -- Rounds and nominations: who can start votes, nomination rules, anonymity.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(25);
+select plan(35);
 
 insert into auth.users (id, email, raw_user_meta_data, aud, role) values
   ('00000000-0000-0000-0000-0000000000a1', 'admin2@test.dev', '{"display_name":"Ada"}', 'authenticated', 'authenticated'),
@@ -34,11 +34,23 @@ select pg_temp.as_user('00000000-0000-0000-0000-0000000000a2');
 select is((select count(*)::int from public.books where google_books_id in ('g1', 'g2', 'g3')), 3, 'users can read the book cache');
 select throws_ok($$ insert into public.books (google_books_id, title) values ('x', 'Fake') $$, '42501', null, 'users cannot write books');
 
+select is(
+  (select array_agg(p order by p) from unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p
+   where has_table_privilege('authenticated', 'public.books', p)),
+  array['SELECT'], 'authenticated has only select on books');
+select is(
+  (select array_agg(p order by p) from unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p
+   where has_table_privilege('authenticated', 'public.rounds', p)),
+  array['SELECT'], 'authenticated has only select on rounds');
+
 -- Starting a vote.
 select throws_ok($$ select public.start_round((select club_id from t), current_date + 7, 'UTC') $$, 'not_allowed', 'members cannot start a vote');
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000a1');
 select throws_ok($$ select public.start_round((select club_id from t), current_date - 1, 'UTC') $$, 'deadline_in_past', 'deadline must be in the future');
 select throws_ok($$ select public.start_round((select club_id from t), current_date + 7, 'Mars/Olympus') $$, 'invalid_timezone', 'timezone must be real');
+select throws_ok($$ select public.start_round((select club_id from t), current_date + 7, 'UTC', 6) $$, 'invalid_input', 'picks each above 5 is rejected');
+select throws_ok($$ select public.start_round((select club_id from t), current_date + 7, 'UTC', 0) $$, 'invalid_input', 'picks each below 1 is rejected');
+select throws_ok($$ select public.start_round((select club_id from t), current_date + 7, 'UTC', 1, false, repeat('x', 501)) $$, 'invalid_input', 'notes over 500 characters are rejected');
 update t set round_id = public.start_round(club_id, current_date + 7, 'America/New_York', null, true, '  Spooky?  ');
 select is((select number from public.rounds where id = (select round_id from t)), 1, 'first vote is Book 1');
 select is((select max_nominations_per_member from public.rounds where id = (select round_id from t)), 1, 'picks each defaults to 1');
@@ -74,6 +86,12 @@ select is((select b.title from public.nominations_public n join public.books b o
 select throws_ok($$ select public.nominate((select round_id from t), '20000000-0000-0000-0000-000000000001', null, (select id from public.nominations_public where not is_mine limit 1)) $$,
   'not_allowed', 'cannot replace someone else''s nomination');
 
+-- Over-long pitches are an input error, not a server error.
+select throws_ok($$ select public.nominate((select round_id from t), '20000000-0000-0000-0000-000000000001', repeat('x', 281), (select id from public.nominations_public where is_mine)) $$,
+  'invalid_input', 'pitch over 280 characters is rejected');
+select throws_ok($$ select public.update_pitch((select id from public.nominations_public where is_mine), repeat('x', 281)) $$,
+  'invalid_input', 'edited pitch over 280 characters is rejected');
+
 -- Outsiders see nothing; picks each can go up but not down.
 select pg_temp.as_user('00000000-0000-0000-0000-0000000000a3');
 select is_empty($$ select * from public.nominations_public $$, 'outsiders cannot see nominations');
@@ -81,6 +99,19 @@ select pg_temp.as_postgres();
 select throws_ok($$ update public.rounds set max_nominations_per_member = 6 where id = (select round_id from t) $$, '23514', null, 'picks each stays within 1..5');
 update public.rounds set max_nominations_per_member = 3 where id = (select round_id from t);
 select throws_ok($$ update public.rounds set max_nominations_per_member = 2 where id = (select round_id from t) $$, 'picks_cannot_decrease', 'picks each cannot go down after nominations');
+
+-- Nominators stay hidden on an anonymous round that was cancelled, and are
+-- revealed only once it is closed.
+select pg_temp.as_postgres();
+select throws_ok($$ insert into public.nominations (round_id, book_id, nominated_by) values (gen_random_uuid(), '20000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-0000000000a2') $$,
+  'round_not_open', 'a nomination for a missing round is rejected cleanly');
+update public.rounds set status = 'cancelled' where id = (select round_id from t);
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000a1');
+select is((select count(*)::int from public.nominations_public where nominated_by is null), 1, 'nominators stay hidden after cancellation');
+select pg_temp.as_postgres();
+update public.rounds set status = 'closed' where id = (select round_id from t);
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000a1');
+select is((select count(*)::int from public.nominations_public where nominated_by is null), 0, 'nominators are revealed once the round is closed');
 
 select * from finish();
 rollback;

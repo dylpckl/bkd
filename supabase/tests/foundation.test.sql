@@ -1,7 +1,7 @@
 -- RLS and RPC rules for clubs, membership and invites. Run with `supabase test db`.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(47);
+select plan(57);
 
 -- Test users: owner, admin, member, outsider.
 insert into auth.users (id, email, raw_user_meta_data, aud, role)
@@ -9,7 +9,9 @@ values
   ('00000000-0000-0000-0000-00000000000a', 'owner@test.dev', '{"display_name":"Olive Owner"}', 'authenticated', 'authenticated'),
   ('00000000-0000-0000-0000-00000000000b', 'admin@test.dev', '{"full_name":"Ada Admin"}', 'authenticated', 'authenticated'),
   ('00000000-0000-0000-0000-00000000000c', 'member@test.dev', '{}', 'authenticated', 'authenticated'),
-  ('00000000-0000-0000-0000-00000000000d', 'outsider@test.dev', '{"display_name":"Otto"}', 'authenticated', 'authenticated');
+  ('00000000-0000-0000-0000-00000000000d', 'outsider@test.dev', '{"display_name":"Otto"}', 'authenticated', 'authenticated'),
+  ('00000000-0000-0000-0000-00000000000e', '@test.dev', '{"picture":"https://lh3.googleusercontent.com/a/me=s96"}', 'authenticated', 'authenticated'),
+  ('00000000-0000-0000-0000-00000000000f', 'f@test.dev', '{"avatar_url":"http://tracker.test/pixel.png","picture":"javascript:alert(1)"}', 'authenticated', 'authenticated');
 
 create function pg_temp.as_user(p_id uuid) returns void language sql as $$
   select set_config('role', 'authenticated', true),
@@ -26,6 +28,9 @@ $$;
 select is((select display_name from public.profiles where id = '00000000-0000-0000-0000-00000000000a'), 'Olive Owner', 'profile uses display_name');
 select is((select display_name from public.profiles where id = '00000000-0000-0000-0000-00000000000b'), 'Ada Admin', 'profile falls back to Google full_name');
 select is((select display_name from public.profiles where id = '00000000-0000-0000-0000-00000000000c'), 'member', 'profile falls back to the email prefix');
+select is((select display_name from public.profiles where id = '00000000-0000-0000-0000-00000000000e'), 'Reader', 'profile falls back to Reader when the email has no local part');
+select is((select avatar_url from public.profiles where id = '00000000-0000-0000-0000-00000000000e'), 'https://lh3.googleusercontent.com/a/me=s96', 'https avatars from Google are kept');
+select is((select avatar_url from public.profiles where id = '00000000-0000-0000-0000-00000000000f'), null, 'non-https avatars are dropped at signup');
 
 -- Owner creates a club; gets the owner role and a 7-day, 20-use invite.
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
@@ -36,6 +41,9 @@ select is(public.club_role((select club_id from t)), 'owner'::public.club_role, 
 select is((select max_uses from public.club_invites where club_id = (select club_id from t)), 20, 'first invite allows 20 uses');
 select ok((select expires_at between now() + interval '6 days 23 hours' and now() + interval '7 days 1 hour'
            from public.club_invites where club_id = (select club_id from t)), 'first invite expires in 7 days');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+select throws_ok($$ update public.profiles set avatar_url = 'javascript:alert(1)' where id = auth.uid() $$,
+  '23514', null, 'avatar_url must be an https URL');
 
 -- Signed-out preview works and leaks nothing about membership.
 select pg_temp.as_anon();
@@ -115,6 +123,9 @@ select is((select status from public.accept_invite((select new_token from t))), 
 -- Leaving, removing, transferring, deleting.
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
 select throws_ok($$ select public.leave_club((select club_id from t)) $$, 'owner_must_transfer', 'owner cannot just leave');
+select pg_temp.as_postgres();
+select throws_ok($$ delete from auth.users where id = '00000000-0000-0000-0000-00000000000a' $$,
+  'owner_has_clubs', 'an account that owns a club cannot be deleted');
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
 select throws_ok($$ select public.delete_club((select club_id from t)) $$, 'not_allowed', 'admin cannot delete the club');
 select lives_ok($$ select public.remove_member((select club_id from t), '00000000-0000-0000-0000-00000000000c') $$, 'admin removes a member');
@@ -125,6 +136,15 @@ select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
 select lives_ok($$ select public.delete_club((select club_id from t)) $$, 'new owner deletes the club');
 select pg_temp.as_postgres();
 select is((select count(*)::int from public.club_members where club_id = (select club_id from t)), 0, 'deleting a club removes its members');
+select lives_ok($$ delete from auth.users where id = '00000000-0000-0000-0000-00000000000a' $$,
+  'an account that owns no club can be deleted');
+
+-- create_club validation and the per-user cap (outsider owns no clubs yet).
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000d');
+select throws_ok($$ select * from public.create_club('   ') $$, 'invalid_club_name', 'blank club names are rejected');
+select throws_ok($$ select * from public.create_club('Ok', repeat('x', 501)) $$, 'invalid_description', 'overlong descriptions are rejected');
+select lives_ok($$ select public.create_club('Club ' || i) from generate_series(1, 10) i $$, 'a user can own 10 clubs');
+select throws_ok($$ select * from public.create_club('One too many') $$, 'club_limit_reached', 'an 11th owned club is refused');
 
 select * from finish();
 rollback;
