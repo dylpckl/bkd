@@ -32,6 +32,11 @@ Smaller copy and style notes are listed in **§7 Mockup → spec reconciliation*
 - **Settings is admin-only** (matching the mockup note). Members leave from a "Leave club" button on club home. Admins who aren't the owner leave from settings.
 - **Role rules:** the owner can promote and demote anyone. Admins can promote members and remove members, but can't demote or remove other admins.
 - **The reset email goes through `/auth/callback?next=/reset-password`** (PKCE), not straight to `/reset-password`. The link has to be opened in the browser that asked for it. The page says so when it fails.
+- **Deadlines show in the vote's own timezone** (the admin's), so everyone sees the date the admin picked, e.g. "Closes Fri, Oct 30", not Sat for people further east.
+- **Edge functions have no npm dependencies.** `nominate` talks to PostgREST with `fetch` (`_shared/rest.ts`). That keeps cold starts fast, and the local edge runtime can't download npm packages behind this environment's proxy anyway.
+- **Google Books needs an API key.** Keyless requests get a daily quota of 0. Locally, without a key, the functions serve a built-in list of 12 books (`_shared/fixtures.ts`), which the e2e tests rely on.
+- **Per-user rate limiting on search is deferred.** Search requires a signed-in user, and the Google key's own quota caps cost. Add it if abuse ever shows up.
+- **Your own nominations appear only in the ballot footer**, not in the list, matching the phase 3 ballot, where you can't rank them.
 - **shadcn/ui components were copied from the upstream GitHub source**, because the shadcn registry host is blocked in the build environment. Add new ones the same way, or with `pnpm dlx shadcn add` where it's reachable.
 
 ---
@@ -205,7 +210,7 @@ Each phase ends deployed to preview, with its tests green. Estimates assume one 
 
 **Done when:** I can create an account three ways, create a club, share the link, and a second account can join through it from a signed-out state and land in the club.
 
-### P2: Nominations (≈ 4 days)
+### P2: Nominations (≈ 4 days) — done
 1. `search-books` edge function: `GET volumes?q=` with the server key, `printType=books`, `maxResults=20`, normalized to `{ googleBooksId, title, authors, coverUrl (https, zoom=1), isbn13, pageCount, publishedDate, description (HTML stripped), publisher/edition }`. Rate limit per user (a simple in-memory or Postgres counter). 60 s CDN cache headers.
 2. `nominate` edge function (create + replace), books upsert, triggers for limit, open round and deadline, `nominations_public` view.
 3. `start_round` RPC + `/votes/new` screen (needed so a round exists to test against).

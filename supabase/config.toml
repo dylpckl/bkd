@@ -391,8 +391,11 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-# [edge_runtime.secrets]
-# secret_key = "env(SECRET_VALUE)"
+# Local only. With no GOOGLE_BOOKS_API_KEY set, search-books and nominate serve a small
+# built-in book list instead of calling Google. To use real results locally, put
+# GOOGLE_BOOKS_API_KEY=... in supabase/functions/.env and run `supabase functions serve`.
+[edge_runtime.secrets]
+GOOGLE_BOOKS_FIXTURES = "true"
 
 [analytics]
 enabled = true

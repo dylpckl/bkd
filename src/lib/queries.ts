@@ -45,9 +45,11 @@ export const myClubsQuery = (userId: string) =>
         await getSupabase()
           .from('club_members')
           .select(
-            'role, joined_at, club:clubs!inner(id, name, description, created_at, members:club_members(count))',
+            'role, joined_at, club:clubs!inner(id, name, description, created_at, members:club_members(count), rounds(id, number, status, deadline, timezone))',
           )
           .eq('user_id', userId)
+          // Only the open round is needed, not the club's whole history.
+          .in('club.rounds.status', ['open', 'closing'])
           .order('joined_at', { ascending: false }),
       )
       return rows.map((r) => ({
@@ -56,6 +58,10 @@ export const myClubsQuery = (userId: string) =>
         name: r.club.name,
         description: r.club.description,
         memberCount: r.club.members[0]?.count ?? 0,
+        openRound:
+          r.club.rounds.find(
+            (x) => x.status === 'open' || x.status === 'closing',
+          ) ?? null,
       }))
     },
   })
@@ -176,3 +182,66 @@ export function avatarSrc(p: {
   if (p.avatar_path) return STORAGE_PUBLIC + p.avatar_path
   return p.avatar_url
 }
+
+export type Round = Database['public']['Tables']['rounds']['Row']
+
+const ROUND_COLUMNS =
+  'id, club_id, number, status, deadline, timezone, max_nominations_per_member, anonymous_nominators, note, winner_nomination_id, created_by, created_at, closed_at'
+
+export const openRoundQuery = (clubId: string) =>
+  queryOptions({
+    queryKey: ['club', clubId, 'open-round'],
+    queryFn: async () =>
+      unwrapMaybe(
+        await getSupabase()
+          .from('rounds')
+          .select(ROUND_COLUMNS)
+          .eq('club_id', clubId)
+          .in('status', ['open', 'closing'])
+          .maybeSingle(),
+      ),
+  })
+
+export const roundQuery = (roundId: string) =>
+  queryOptions({
+    queryKey: ['round', roundId],
+    queryFn: async () =>
+      unwrapMaybe(
+        await getSupabase()
+          .from('rounds')
+          .select(ROUND_COLUMNS)
+          .eq('id', roundId)
+          .maybeSingle(),
+      ),
+  })
+
+const BOOK_COLUMNS =
+  'id, google_books_id, title, subtitle, authors, cover_url, isbn13, page_count, published_date, description, publisher, categories'
+
+export const nominationsQuery = (roundId: string) =>
+  queryOptions({
+    queryKey: ['round', roundId, 'nominations'],
+    queryFn: async () => {
+      const rows = unwrap(
+        await getSupabase()
+          .from('nominations_public')
+          .select(
+            `id, round_id, nominated_by, is_mine, pitch, created_at, book:books!inner(${BOOK_COLUMNS})`,
+          )
+          .eq('round_id', roundId)
+          .order('created_at'),
+      )
+      return rows.map((r) => ({
+        id: r.id as string,
+        nominatedBy: r.nominated_by,
+        isMine: r.is_mine === true,
+        pitch: r.pitch,
+        createdAt: r.created_at as string,
+        book: r.book,
+      }))
+    },
+  })
+
+export type Nomination = Awaited<
+  ReturnType<NonNullable<ReturnType<typeof nominationsQuery>['queryFn']>>
+>[number]
