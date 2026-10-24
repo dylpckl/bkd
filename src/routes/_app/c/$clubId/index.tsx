@@ -3,6 +3,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { ChevronDown, Clock, Settings, UserPlus } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import { AvatarStack } from '#/components/avatar'
+import { BookCover } from '#/components/book-cover'
 import { LeaveClubButton } from '#/components/leave-club'
 import {
   Chip,
@@ -14,16 +15,30 @@ import {
 } from '#/components/layout'
 import {
   clubQuery,
+  currentBookQuery,
   membersQuery,
   nominationsQuery,
   openRoundQuery,
+  voteStatusQuery,
 } from '#/lib/queries'
 import type { Round } from '#/lib/queries'
+import { authorLine } from '#/lib/books'
 import { daysLeftLabel, formatDeadline } from '#/lib/dates'
 
 export const Route = createFileRoute('/_app/c/$clubId/')({
-  loader: ({ context, params }) =>
-    context.queryClient.ensureQueryData(membersQuery(params.clubId)),
+  loader: async ({ context, params }) => {
+    const [, round] = await Promise.all([
+      context.queryClient.ensureQueryData(membersQuery(params.clubId)),
+      context.queryClient.ensureQueryData(openRoundQuery(params.clubId)),
+      context.queryClient.ensureQueryData(currentBookQuery(params.clubId)),
+    ])
+    if (round) {
+      await Promise.all([
+        context.queryClient.ensureQueryData(nominationsQuery(round.id)),
+        context.queryClient.ensureQueryData(voteStatusQuery(round.id)),
+      ])
+    }
+  },
   component: ClubHome,
 })
 
@@ -33,6 +48,7 @@ function ClubHome() {
   const { data: club } = useSuspenseQuery(clubQuery(clubId, user.id))
   const { data: members } = useSuspenseQuery(membersQuery(clubId))
   const { data: round } = useSuspenseQuery(openRoundQuery(clubId))
+  const { data: current } = useSuspenseQuery(currentBookQuery(clubId))
   if (!club) return null
 
   return (
@@ -41,7 +57,7 @@ function ClubHome() {
         <Link
           to="/clubs"
           aria-label={`${club.name}, back to your clubs`}
-          className="inline-flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-foreground hover:text-foreground"
+          className="text-foreground hover:text-foreground inline-flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-lg px-2"
         >
           <span className="font-display truncate text-[22px]">{club.name}</span>
           <ChevronDown className="size-[18px] shrink-0" aria-hidden />
@@ -51,7 +67,7 @@ function ClubHome() {
             to="/c/$clubId/settings"
             params={{ clubId }}
             aria-label="Club settings"
-            className="inline-flex size-11 items-center justify-center rounded-lg text-foreground hover:bg-muted hover:text-foreground"
+            className="text-foreground hover:bg-muted hover:text-foreground inline-flex size-11 items-center justify-center rounded-lg"
           >
             <Settings className="size-[22px]" aria-hidden />
           </Link>
@@ -63,21 +79,58 @@ function ClubHome() {
         )}
 
         {round ? (
-          <OpenVoteCard clubId={clubId} round={round} />
+          <OpenVoteCard clubId={clubId} round={round} userId={user.id} />
         ) : (
-          <Panel className="border-dashed">
-            <h2 className="font-display text-[22px]">No vote open</h2>
-            <p className="text-muted-foreground">
-              {club.isAdmin
-                ? 'Start a vote and everyone can nominate books, then rank them.'
-                : 'When an admin starts a vote for the next book, it shows up here.'}
-            </p>
-          </Panel>
+          !current && (
+            <Panel className="border-dashed">
+              <h2 className="font-display text-[22px]">No vote open</h2>
+              <p className="text-muted-foreground">
+                {club.isAdmin
+                  ? 'Start a vote and everyone can nominate books, then rank them.'
+                  : 'When an admin starts a vote for the next book, it shows up here.'}
+              </p>
+            </Panel>
+          )
         )}
 
-        <div className="mt-1.5 flex items-center justify-between">
-          <SectionLabel>Members ({members.length})</SectionLabel>
-        </div>
+        {current && (
+          <>
+            <SectionLabel className="mt-1.5">Currently reading</SectionLabel>
+            <Panel>
+              <div className="flex items-start gap-3">
+                <BookCover
+                  title={current.book.title}
+                  coverUrl={current.book.cover_url}
+                  idKey={current.book.google_books_id}
+                  width={56}
+                />
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="text-muted-foreground text-[13px]">
+                    Book {current.number}
+                  </span>
+                  <strong className="text-[17px]">{current.book.title}</strong>
+                  <span className="text-muted-foreground text-[13px]">
+                    {authorLine(current.book.authors)}
+                  </span>
+                </div>
+              </div>
+              {current.round_id && (
+                <Button asChild variant="outline">
+                  <Link
+                    to="/c/$clubId/votes/$roundId"
+                    params={{ clubId, roundId: current.round_id }}
+                  >
+                    How book {current.number} was picked
+                  </Link>
+                </Button>
+              )}
+            </Panel>
+          </>
+        )}
+
+        <SectionLabel className="mt-1.5">
+          Members ({members.length})
+        </SectionLabel>
         <Panel>
           <AvatarStack
             people={members.map((m) => ({
@@ -117,8 +170,25 @@ function ClubHome() {
   )
 }
 
-function OpenVoteCard({ clubId, round }: { clubId: string; round: Round }) {
+function OpenVoteCard({
+  clubId,
+  round,
+  userId,
+}: {
+  clubId: string
+  round: Round
+  userId: string
+}) {
   const { data: nominations } = useSuspenseQuery(nominationsQuery(round.id))
+  const { data: status } = useSuspenseQuery(voteStatusQuery(round.id))
+  const { data: members } = useSuspenseQuery(membersQuery(clubId))
+  const byId = new Map(members.map((m) => [m.userId, m]))
+  const voters = status
+    .filter((s) => s.has_voted)
+    .map((s) => byId.get(s.user_id))
+    .filter((m) => !!m)
+  const iVoted = status.some((s) => s.user_id === userId && s.has_voted)
+
   return (
     <Panel className="border-primary border-2 p-[15px]">
       <div className="flex items-center justify-between">
@@ -133,12 +203,37 @@ function OpenVoteCard({ clubId, round }: { clubId: string; round: Round }) {
         Closes end of {formatDeadline(round.deadline, round.timezone)} —{' '}
         {daysLeftLabel(round.deadline, round.timezone).toLowerCase()}
       </p>
-      <div className="bg-background flex flex-col rounded-lg px-3 py-2.5">
-        <strong className="text-xl">{nominations.length}</strong>
-        <span className="text-muted-foreground text-[13px]">
-          {nominations.length === 1 ? 'book nominated' : 'books nominated'}
-        </span>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-background flex flex-col rounded-lg px-3 py-2.5">
+          <strong className="text-xl">{nominations.length}</strong>
+          <span className="text-muted-foreground text-[13px]">
+            {nominations.length === 1 ? 'book nominated' : 'books nominated'}
+          </span>
+        </div>
+        <div className="bg-background flex flex-col rounded-lg px-3 py-2.5">
+          <strong className="text-xl">
+            {voters.length} of {status.length}
+          </strong>
+          <span className="text-muted-foreground text-[13px]">
+            members voted
+          </span>
+        </div>
       </div>
+      {voters.length > 0 && (
+        <div className="flex items-center">
+          <AvatarStack
+            people={voters.map((m) => ({
+              id: m.userId,
+              name: m.displayName,
+              src: m.avatarUrl,
+            }))}
+            size={28}
+          />
+          <span className="text-muted-foreground ml-2.5 text-[13px]">
+            voted{iVoted ? ' · including you' : ' · you haven’t yet'}
+          </span>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <Button asChild variant="outline">
           <Link
@@ -154,7 +249,7 @@ function OpenVoteCard({ clubId, round }: { clubId: string; round: Round }) {
             to="/c/$clubId/votes/$roundId"
             params={{ clubId, roundId: round.id }}
           >
-            See the books
+            {iVoted ? 'Change ranking' : 'Rank books'}
           </Link>
         </Button>
       </div>

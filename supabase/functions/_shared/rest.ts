@@ -54,6 +54,12 @@ export function asUser(authorization: string) {
 
 /** Service-role requests. Bypasses RLS; only for writes users can't make themselves. */
 export const asService = {
+  rpc: <T>(fn: string, args: Record<string, unknown>) =>
+    call<T>(
+      `rpc/${fn}`,
+      { method: 'POST', body: JSON.stringify(args) },
+      { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+    ),
   upsert: <T>(
     table: string,
     row: Record<string, unknown>,
@@ -70,6 +76,31 @@ export const asService = {
       },
       { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
     ),
+}
+
+/** Compares two strings without leaking where they differ: hash both, then XOR every byte. */
+async function safeEqual(a: string, b: string) {
+  const enc = new TextEncoder()
+  const [x, y] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(a)),
+    crypto.subtle.digest('SHA-256', enc.encode(b)),
+  ])
+  const xa = new Uint8Array(x)
+  const ya = new Uint8Array(y)
+  let diff = 0
+  for (let i = 0; i < xa.length; i++) diff |= xa[i] ^ ya[i]
+  return diff === 0
+}
+
+/**
+ * True when the request carries the service-role key (pg_cron), not a user's JWT.
+ * The Vault secret `close_round_key` must therefore be the legacy service_role JWT,
+ * identical to this function's SUPABASE_SERVICE_ROLE_KEY. A new-style `sb_secret_...`
+ * key is not accepted.
+ */
+export async function isServiceCall(authorization: string | null) {
+  if (authorization === null) return false
+  return safeEqual(authorization, `Bearer ${SERVICE_KEY}`)
 }
 
 /**

@@ -34,6 +34,87 @@ export type Database = {
   }
   public: {
     Tables: {
+      ballot_rankings: {
+        Row: {
+          nomination_id: string
+          rank: number
+          round_id: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          nomination_id: string
+          rank: number
+          round_id: string
+          user_id: string
+        }
+        Update: {
+          nomination_id?: string
+          rank?: number
+          round_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'ballot_rankings_nomination_id_fkey'
+            columns: ['nomination_id']
+            isOneToOne: false
+            referencedRelation: 'nominations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'ballot_rankings_nomination_id_fkey'
+            columns: ['nomination_id']
+            isOneToOne: false
+            referencedRelation: 'nominations_public'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'ballot_rankings_round_id_user_id_fkey'
+            columns: ['round_id', 'user_id']
+            isOneToOne: false
+            referencedRelation: 'ballots'
+            referencedColumns: ['round_id', 'user_id']
+          },
+        ]
+      }
+      ballots: {
+        Row: {
+          first_cast_at: string
+          round_id: string
+          updated_at: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          first_cast_at?: string
+          round_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          first_cast_at?: string
+          round_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'ballots_round_id_fkey'
+            columns: ['round_id']
+            isOneToOne: false
+            referencedRelation: 'rounds'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'ballots_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       books: {
         Row: {
           authors: string[]
@@ -85,6 +166,65 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      club_books: {
+        Row: {
+          book_id: string
+          club_id: string
+          discussion_mode: Database['public']['Enums']['discussion_mode']
+          finished_at: string | null
+          id: string
+          number: number
+          round_id: string | null
+          started_at: string
+          status: Database['public']['Enums']['club_book_status']
+        }
+        ComputedFields: never
+        Insert: {
+          book_id: string
+          club_id: string
+          discussion_mode?: Database['public']['Enums']['discussion_mode']
+          finished_at?: string | null
+          id?: string
+          number: number
+          round_id?: string | null
+          started_at?: string
+          status?: Database['public']['Enums']['club_book_status']
+        }
+        Update: {
+          book_id?: string
+          club_id?: string
+          discussion_mode?: Database['public']['Enums']['discussion_mode']
+          finished_at?: string | null
+          id?: string
+          number?: number
+          round_id?: string | null
+          started_at?: string
+          status?: Database['public']['Enums']['club_book_status']
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'club_books_book_id_fkey'
+            columns: ['book_id']
+            isOneToOne: false
+            referencedRelation: 'books'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'club_books_club_id_fkey'
+            columns: ['club_id']
+            isOneToOne: false
+            referencedRelation: 'clubs'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'club_books_round_id_fkey'
+            columns: ['round_id']
+            isOneToOne: true
+            referencedRelation: 'rounds'
+            referencedColumns: ['id']
+          },
+        ]
       }
       club_invites: {
         Row: {
@@ -287,9 +427,41 @@ export type Database = {
         }
         Relationships: []
       }
+      round_results: {
+        Row: {
+          computed_at: string
+          round_id: string
+          tallies: NonNullable<Json>
+          tiebreak_seed: string
+        }
+        ComputedFields: never
+        Insert: {
+          computed_at?: string
+          round_id: string
+          tallies: NonNullable<Json>
+          tiebreak_seed: string
+        }
+        Update: {
+          computed_at?: string
+          round_id?: string
+          tallies?: NonNullable<Json>
+          tiebreak_seed?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'round_results_round_id_fkey'
+            columns: ['round_id']
+            isOneToOne: true
+            referencedRelation: 'rounds'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       rounds: {
         Row: {
           anonymous_nominators: boolean
+          close_attempts: number
+          close_claimed_at: string | null
           closed_at: string | null
           club_id: string
           created_at: string
@@ -306,6 +478,8 @@ export type Database = {
         ComputedFields: never
         Insert: {
           anonymous_nominators?: boolean
+          close_attempts?: number
+          close_claimed_at?: string | null
           closed_at?: string | null
           club_id: string
           created_at?: string
@@ -321,6 +495,8 @@ export type Database = {
         }
         Update: {
           anonymous_nominators?: boolean
+          close_attempts?: number
+          close_claimed_at?: string | null
           closed_at?: string | null
           club_id?: string
           created_at?: string
@@ -413,6 +589,12 @@ export type Database = {
           status: string
         }[]
       }
+      can_close_round: { Args: { p_round_id: string }; Returns: boolean }
+      cancel_round: { Args: { p_round_id: string }; Returns: undefined }
+      claim_round_close: {
+        Args: { p_early?: boolean; p_round_id: string }
+        Returns: Json
+      }
       club_role: {
         Args: { p_club_id: string }
         Returns: Database['public']['Enums']['club_role']
@@ -429,6 +611,10 @@ export type Database = {
         Returns: string
       }
       delete_club: { Args: { p_club_id: string }; Returns: undefined }
+      finalize_round: {
+        Args: { p_result: Json; p_round_id: string }
+        Returns: string
+      }
       invite_preview: { Args: { p_token: string }; Returns: Json }
       invite_status: {
         Args: {
@@ -456,7 +642,30 @@ export type Database = {
         Args: { p_club_id: string; p_user_id: string }
         Returns: undefined
       }
+      remove_nomination: {
+        Args: { p_nomination_id: string }
+        Returns: undefined
+      }
+      request_round_closes: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       revoke_invite: { Args: { p_invite_id: string }; Returns: undefined }
+      round_vote_status: {
+        Args: { p_round_id: string }
+        Returns: {
+          has_voted: boolean
+          user_id: string
+        }[]
+      }
+      rounds_due_for_close: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      save_ballot: {
+        Args: { p_nomination_ids: string[]; p_round_id: string }
+        Returns: string
+      }
       set_member_role: {
         Args: {
           p_club_id: string
@@ -485,9 +694,21 @@ export type Database = {
         Args: { p_nomination_id: string; p_pitch: string }
         Returns: undefined
       }
+      update_round: {
+        Args: {
+          p_anonymous?: boolean
+          p_deadline_date?: string
+          p_max_nominations?: number
+          p_round_id: string
+          p_timezone?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
+      club_book_status: 'reading' | 'finished'
       club_role: 'owner' | 'admin' | 'member'
+      discussion_mode: 'single' | 'sections'
       round_status: 'open' | 'closing' | 'closed' | 'cancelled'
     }
     CompositeTypes: {
@@ -616,7 +837,9 @@ export const Constants = {
   },
   public: {
     Enums: {
+      club_book_status: ['reading', 'finished'],
       club_role: ['owner', 'admin', 'member'],
+      discussion_mode: ['single', 'sections'],
       round_status: ['open', 'closing', 'closed', 'cancelled'],
     },
   },

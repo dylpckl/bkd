@@ -21,6 +21,8 @@ const MESSAGES: Record<string, string> = {
   nomination_limit_reached: 'You’ve used all your picks for this book.',
   already_nominated: 'Someone already nominated that book.',
   picks_cannot_decrease: 'Picks each can’t go down once people have nominated.',
+  anonymity_locked:
+    'Anonymous voting can’t be turned off once people have nominated.',
   search_unavailable:
     'Book search isn’t available right now. Try again in a minute.',
   search_not_configured:
@@ -39,6 +41,17 @@ export function errorMessage(
   const message = (error as { message?: string } | null)?.message
   if (message && message in MESSAGES) return MESSAGES[message]
   return fallback
+}
+
+/**
+ * True for failures that may pass on their own (network drop, gateway or
+ * timeout errors). Errors from our own rules (`round_not_open`, `not_allowed`)
+ * carry a Postgres code and fail the same way every time.
+ */
+export function isTransientError(error: unknown) {
+  const code = (error as { code?: string } | null)?.code
+  if (!code) return true
+  return /^(08|53|57|PGRST00[0-3])/.test(code)
 }
 
 /** Awaits a Supabase call and throws its error, so it can be used with useMutation. */

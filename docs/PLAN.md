@@ -37,6 +37,12 @@ Smaller copy and style notes are listed in **§7 Mockup → spec reconciliation*
 - **Google Books needs an API key.** Keyless requests get a daily quota of 0. Locally, without a key, the functions serve a built-in list of 12 books (`_shared/fixtures.ts`), which the e2e tests rely on.
 - **Per-user rate limiting on search is deferred.** Search requires a signed-in user, and the Google key's own quota caps cost. Add it if abuse ever shows up.
 - **Your own nominations appear only in the ballot footer**, not in the list, matching the phase 3 ballot, where you can't rank them.
+- **IRV lives in `supabase/functions/_shared/irv.ts`**, not `packages/irv`. The local edge runtime only mounts `supabase/functions`, so shared code has to live there. The app imports the same file through a relative path.
+- **Ballots have a header row** (`ballots.first_cast_at`) alongside `ballot_rankings`, because "New since you voted" needs to know when someone first voted, and that survives reordering.
+- **Closing is two database calls around the TypeScript count**: `claim_round_close` (open → closing) and `finalize_round`, both safe to repeat. A claim older than 5 minutes is retaken on the next cron run.
+- **pg_cron runs every 5 minutes** and calls `close-round` through pg_net, but only when a vote is overdue. The URL and service key come from Vault (`close_round_url`, `close_round_key`). The local seed sets them; production has to set them once (see README).
+- **Ties for last place show their reason** on the results page, e.g. "Knocked out second (tied, but behind in an earlier count)", alongside the spec's "(tied, but on fewer ballots)".
+- **Until phase 4 adds book pages**, the results footer says "Back to club", and club home's "Currently reading" card links to "How book N was picked".
 - **shadcn/ui components were copied from the upstream GitHub source**, because the shadcn registry host is blocked in the build environment. Add new ones the same way, or with `pnpm dlx shadcn add` where it's reachable.
 
 ---
@@ -217,7 +223,7 @@ Each phase ends deployed to preview, with its tests green. Estimates assume one 
 4. `BookSearch` command dialog + `BookSheet` (drawer/dialog), "Already nominated" (D6), pitch.
 5. pgTAP: limit, duplicate book, closed round, anonymity view.
 
-### P3: Voting (≈ 1.5 weeks)
+### P3: Voting (≈ 1.5 weeks) — done
 1. `packages/irv` + tests (first).
 2. Ballot: dnd-kit sortable (Pointer + Touch with a 150 ms delay so scrolling isn't hijacked, Keyboard with `sortableKeyboardCoordinates`), custom `announcements`, rows ≥56 px, drag handle plus the whole row. `save_ballot` debounced at 600 ms with optimistic TanStack Query cache and retry, and the "✓ Saved" chip. Single-row case (D3).
 3. Ballot triggers (own nomination, closed, deadline). `round_vote_status`.

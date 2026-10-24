@@ -86,6 +86,8 @@ function ClubsPage() {
                             club.openRound.timezone,
                           )}
                         </Chip>
+                      ) : club.reading ? (
+                        <Chip tone="green">Reading {club.reading}</Chip>
                       ) : (
                         <Chip>Between books</Chip>
                       )}
