@@ -14,6 +14,7 @@ import {
 } from '#/lib/queries'
 import type { BookSummary } from '#/lib/queries'
 import { starsLabel } from '#/lib/goodreads'
+import { formatRating } from '#/lib/history'
 
 export const Route = createFileRoute('/_app/c/$clubId/books/$bookId/reviews')({
   loader: ({ context, params }) =>
@@ -183,7 +184,7 @@ function SummaryCard({ summary }: { summary: BookSummary }) {
     <Panel className="flex-row items-center gap-[18px]">
       <div className="flex min-w-[84px] flex-col items-center">
         <span className="font-display text-primary text-[44px]">
-          {summary.average ?? '–'}
+          {summary.average === null ? '–' : formatRating(summary.average)}
         </span>
         <StarDisplay value={summary.average ?? 0} size={14} />
         <span className="text-muted-foreground text-[13px]">

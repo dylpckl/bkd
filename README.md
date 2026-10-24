@@ -16,7 +16,7 @@ pnpm db:start        # local Supabase in Docker; applies migrations and the demo
 pnpm dev             # http://localhost:3000
 ```
 
-Demo accounts (password `bookclub`): `dylan@example.com` owns "The Overdue Society". The other members are `jimmy@`, `adam@`, `giovanni@`, `brianna@` and `priya@example.com`. A demo invite link is at <http://localhost:3000/join/demo-invite-overdue>.
+Demo accounts (password `bookclub`): `dylan@example.com` owns "The Overdue Society", which has read three books and is reading a fourth. The other members are `jimmy@`, `adam@`, `giovanni@`, `brianna@` and `priya@example.com`. A demo invite link is at <http://localhost:3000/join/demo-invite-overdue>.
 
 Sign-up, magic-link and reset emails don't go out locally. Open them in Mailpit at <http://127.0.0.1:54324>. Supabase Studio is at <http://127.0.0.1:54323>.
 

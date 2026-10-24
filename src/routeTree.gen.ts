@@ -22,6 +22,7 @@ import { Route as AppClubsNewRouteImport } from './routes/_app/clubs/new'
 import { Route as AppCClubIdIndexRouteImport } from './routes/_app/c/$clubId/index'
 import { Route as AppCClubIdInviteRouteImport } from './routes/_app/c/$clubId/invite'
 import { Route as AppCClubIdSettingsRouteImport } from './routes/_app/c/$clubId/settings'
+import { Route as AppCClubIdBooksIndexRouteImport } from './routes/_app/c/$clubId/books/index'
 import { Route as AppCClubIdBooksBookIdRouteRouteImport } from './routes/_app/c/$clubId/books/$bookId/route'
 import { Route as AppCClubIdVotesNewRouteImport } from './routes/_app/c/$clubId/votes/new'
 import { Route as AppCClubIdBooksBookIdIndexRouteImport } from './routes/_app/c/$clubId/books/$bookId/index'
@@ -94,6 +95,11 @@ const AppCClubIdSettingsRoute = AppCClubIdSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppCClubIdRouteRoute,
 } as any)
+const AppCClubIdBooksIndexRoute = AppCClubIdBooksIndexRouteImport.update({
+  id: '/books/',
+  path: '/books/',
+  getParentRoute: () => AppCClubIdRouteRoute,
+} as any)
 const AppCClubIdBooksBookIdRouteRoute =
   AppCClubIdBooksBookIdRouteRouteImport.update({
     id: '/books/$bookId',
@@ -151,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/c/$clubId/': typeof AppCClubIdIndexRoute
   '/c/$clubId/books/$bookId': typeof AppCClubIdBooksBookIdRouteRouteWithChildren
   '/c/$clubId/votes/new': typeof AppCClubIdVotesNewRoute
+  '/c/$clubId/books/': typeof AppCClubIdBooksIndexRoute
   '/c/$clubId/books/$bookId/review': typeof AppCClubIdBooksBookIdReviewRoute
   '/c/$clubId/books/$bookId/reviews': typeof AppCClubIdBooksBookIdReviewsRoute
   '/c/$clubId/votes/$roundId/manage': typeof AppCClubIdVotesRoundIdManageRoute
@@ -170,6 +177,7 @@ export interface FileRoutesByTo {
   '/c/$clubId/settings': typeof AppCClubIdSettingsRoute
   '/c/$clubId': typeof AppCClubIdIndexRoute
   '/c/$clubId/votes/new': typeof AppCClubIdVotesNewRoute
+  '/c/$clubId/books': typeof AppCClubIdBooksIndexRoute
   '/c/$clubId/books/$bookId/review': typeof AppCClubIdBooksBookIdReviewRoute
   '/c/$clubId/books/$bookId/reviews': typeof AppCClubIdBooksBookIdReviewsRoute
   '/c/$clubId/votes/$roundId/manage': typeof AppCClubIdVotesRoundIdManageRoute
@@ -193,6 +201,7 @@ export interface FileRoutesById {
   '/_app/c/$clubId/': typeof AppCClubIdIndexRoute
   '/_app/c/$clubId/books/$bookId': typeof AppCClubIdBooksBookIdRouteRouteWithChildren
   '/_app/c/$clubId/votes/new': typeof AppCClubIdVotesNewRoute
+  '/_app/c/$clubId/books/': typeof AppCClubIdBooksIndexRoute
   '/_app/c/$clubId/books/$bookId/review': typeof AppCClubIdBooksBookIdReviewRoute
   '/_app/c/$clubId/books/$bookId/reviews': typeof AppCClubIdBooksBookIdReviewsRoute
   '/_app/c/$clubId/votes/$roundId/manage': typeof AppCClubIdVotesRoundIdManageRoute
@@ -216,6 +225,7 @@ export interface FileRouteTypes {
     | '/c/$clubId/'
     | '/c/$clubId/books/$bookId'
     | '/c/$clubId/votes/new'
+    | '/c/$clubId/books/'
     | '/c/$clubId/books/$bookId/review'
     | '/c/$clubId/books/$bookId/reviews'
     | '/c/$clubId/votes/$roundId/manage'
@@ -235,6 +245,7 @@ export interface FileRouteTypes {
     | '/c/$clubId/settings'
     | '/c/$clubId'
     | '/c/$clubId/votes/new'
+    | '/c/$clubId/books'
     | '/c/$clubId/books/$bookId/review'
     | '/c/$clubId/books/$bookId/reviews'
     | '/c/$clubId/votes/$roundId/manage'
@@ -257,6 +268,7 @@ export interface FileRouteTypes {
     | '/_app/c/$clubId/'
     | '/_app/c/$clubId/books/$bookId'
     | '/_app/c/$clubId/votes/new'
+    | '/_app/c/$clubId/books/'
     | '/_app/c/$clubId/books/$bookId/review'
     | '/_app/c/$clubId/books/$bookId/reviews'
     | '/_app/c/$clubId/votes/$roundId/manage'
@@ -366,6 +378,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCClubIdSettingsRouteImport
       parentRoute: typeof AppCClubIdRouteRoute
     }
+    '/_app/c/$clubId/books/': {
+      id: '/_app/c/$clubId/books/'
+      path: '/books'
+      fullPath: '/c/$clubId/books/'
+      preLoaderRoute: typeof AppCClubIdBooksIndexRouteImport
+      parentRoute: typeof AppCClubIdRouteRoute
+    }
     '/_app/c/$clubId/books/$bookId': {
       id: '/_app/c/$clubId/books/$bookId'
       path: '/books/$bookId'
@@ -442,6 +461,7 @@ interface AppCClubIdRouteRouteChildren {
   AppCClubIdIndexRoute: typeof AppCClubIdIndexRoute
   AppCClubIdBooksBookIdRouteRoute: typeof AppCClubIdBooksBookIdRouteRouteWithChildren
   AppCClubIdVotesNewRoute: typeof AppCClubIdVotesNewRoute
+  AppCClubIdBooksIndexRoute: typeof AppCClubIdBooksIndexRoute
   AppCClubIdVotesRoundIdManageRoute: typeof AppCClubIdVotesRoundIdManageRoute
   AppCClubIdVotesRoundIdIndexRoute: typeof AppCClubIdVotesRoundIdIndexRoute
 }
@@ -452,6 +472,7 @@ const AppCClubIdRouteRouteChildren: AppCClubIdRouteRouteChildren = {
   AppCClubIdIndexRoute: AppCClubIdIndexRoute,
   AppCClubIdBooksBookIdRouteRoute: AppCClubIdBooksBookIdRouteRouteWithChildren,
   AppCClubIdVotesNewRoute: AppCClubIdVotesNewRoute,
+  AppCClubIdBooksIndexRoute: AppCClubIdBooksIndexRoute,
   AppCClubIdVotesRoundIdManageRoute: AppCClubIdVotesRoundIdManageRoute,
   AppCClubIdVotesRoundIdIndexRoute: AppCClubIdVotesRoundIdIndexRoute,
 }

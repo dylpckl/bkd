@@ -703,6 +703,26 @@ export type Database = {
       }
       club_book_club: { Args: { p_club_book_id: string }; Returns: string }
       club_book_summary: { Args: { p_club_book_id: string }; Returns: Json }
+      club_history: {
+        Args: { p_club_id: string }
+        Returns: {
+          authors: string[]
+          average: number
+          count_rounds: number
+          cover_url: string
+          finished_at: string
+          google_books_id: string
+          id: string
+          nominee_count: number
+          number: number
+          pick_method: string
+          review_count: number
+          round_id: string
+          started_at: string
+          status: Database['public']['Enums']['club_book_status']
+          title: string
+        }[]
+      }
       club_role: {
         Args: { p_club_id: string }
         Returns: Database['public']['Enums']['club_role']
@@ -740,6 +760,21 @@ export type Database = {
       is_club_admin: { Args: { p_club_id: string }; Returns: boolean }
       is_club_member: { Args: { p_club_id: string }; Returns: boolean }
       leave_club: { Args: { p_club_id: string }; Returns: undefined }
+      needs_you: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          book_title: string
+          club_book_id: string
+          club_id: string
+          club_name: string
+          deadline: string
+          finished_count: number
+          kind: string
+          member_count: number
+          round_id: string
+          timezone: string
+        }[]
+      }
       new_invite_token: { Args: Record<PropertyKey, never>; Returns: string }
       nominate: {
         Args: {
@@ -758,6 +793,14 @@ export type Database = {
           p_rating: number
         }
         Returns: string
+      }
+      profile_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          average: number
+          books_read: number
+          review_count: number
+        }[]
       }
       remove_member: {
         Args: { p_club_id: string; p_user_id: string }

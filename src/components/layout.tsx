@@ -104,12 +104,15 @@ export function FooterBar({
 export function SectionLabel({
   children,
   className,
+  id,
 }: {
   children: ReactNode
   className?: string
+  id?: string
 }) {
   return (
     <h2
+      id={id}
       className={cn(
         'text-muted-foreground text-xs font-bold tracking-[0.06em] uppercase',
         className,
