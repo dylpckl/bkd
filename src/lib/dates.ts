@@ -79,3 +79,16 @@ export function addDays(d: Date, days: number) {
 export function localTimezone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone
 }
+
+/** "now", "5m", "3h", "2d", then "Oct 12". */
+export function timeAgo(iso: string, now = new Date()) {
+  const s = Math.max(0, (now.getTime() - new Date(iso).getTime()) / 1000)
+  if (s < 60) return 'now'
+  if (s < 3600) return `${Math.floor(s / 60)}m`
+  if (s < 86_400) return `${Math.floor(s / 3600)}h`
+  if (s < 7 * 86_400) return `${Math.floor(s / 86_400)}d`
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(iso))
+}

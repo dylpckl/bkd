@@ -343,3 +343,101 @@ export const currentBookQuery = (clubId: string) =>
           .maybeSingle(),
       ),
   })
+
+export const clubBookQuery = (bookId: string) =>
+  queryOptions({
+    queryKey: ['club-book', bookId],
+    queryFn: async () =>
+      unwrapMaybe(
+        await getSupabase()
+          .from('club_books')
+          .select(
+            `id, club_id, number, status, discussion_mode, started_at, finished_at, round_id, book:books!inner(${BOOK_COLUMNS})`,
+          )
+          .eq('id', bookId)
+          .maybeSingle(),
+      ),
+  })
+
+export type ClubBook = NonNullable<
+  Awaited<ReturnType<NonNullable<ReturnType<typeof clubBookQuery>['queryFn']>>>
+>
+
+export type BookSummary = {
+  average: number | null
+  review_count: number | null
+  member_count: number
+  finished_user_ids: string[]
+  unlocked: boolean
+  distribution: Record<string, number> | null
+}
+
+export const bookSummaryQuery = (bookId: string) =>
+  queryOptions({
+    queryKey: ['club-book', bookId, 'summary'],
+    // Changes as other members post and finish. Loaders use fetchQuery, so this
+    // means every visit gets fresh data (suspense raises staleTime to 1s otherwise).
+    staleTime: 0,
+    queryFn: async () =>
+      unwrap(
+        await getSupabase().rpc('club_book_summary', {
+          p_club_book_id: bookId,
+        }),
+      ) as unknown as BookSummary,
+  })
+
+export const postsQuery = (bookId: string) =>
+  queryOptions({
+    queryKey: ['club-book', bookId, 'posts'],
+    // Changes as other members post and finish. Loaders use fetchQuery, so this
+    // means every visit gets fresh data (suspense raises staleTime to 1s otherwise).
+    staleTime: 0,
+    queryFn: async () =>
+      unwrap(
+        await getSupabase()
+          .from('posts')
+          .select('id, parent_id, author_id, body, created_at, edited_at')
+          .eq('club_book_id', bookId)
+          .order('created_at'),
+      ),
+  })
+
+export type Post = Awaited<
+  ReturnType<NonNullable<ReturnType<typeof postsQuery>['queryFn']>>
+>[number]
+
+export const reviewsQuery = (bookId: string) =>
+  queryOptions({
+    queryKey: ['club-book', bookId, 'reviews'],
+    // Changes as other members post and finish. Loaders use fetchQuery, so this
+    // means every visit gets fresh data (suspense raises staleTime to 1s otherwise).
+    staleTime: 0,
+    queryFn: async () =>
+      unwrap(
+        await getSupabase()
+          .from('reviews')
+          .select(
+            'id, user_id, rating, body, goodreads_url, created_at, updated_at',
+          )
+          .eq('club_book_id', bookId)
+          .order('created_at'),
+      ),
+  })
+
+export type Review = Awaited<
+  ReturnType<NonNullable<ReturnType<typeof reviewsQuery>['queryFn']>>
+>[number]
+
+/** The club book a closed round produced, for the results page's "Go to" button. */
+export const roundClubBookQuery = (roundId: string) =>
+  queryOptions({
+    queryKey: ['round', roundId, 'club-book'],
+    queryFn: async () =>
+      unwrapMaybe(
+        await getSupabase()
+          .from('club_books')
+          .select('id, book:books!inner(title)')
+          .eq('round_id', roundId)
+          .maybeSingle(),
+      ),
+  })

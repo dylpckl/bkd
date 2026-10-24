@@ -22,7 +22,11 @@ import { Route as AppClubsNewRouteImport } from './routes/_app/clubs/new'
 import { Route as AppCClubIdIndexRouteImport } from './routes/_app/c/$clubId/index'
 import { Route as AppCClubIdInviteRouteImport } from './routes/_app/c/$clubId/invite'
 import { Route as AppCClubIdSettingsRouteImport } from './routes/_app/c/$clubId/settings'
+import { Route as AppCClubIdBooksBookIdRouteRouteImport } from './routes/_app/c/$clubId/books/$bookId/route'
 import { Route as AppCClubIdVotesNewRouteImport } from './routes/_app/c/$clubId/votes/new'
+import { Route as AppCClubIdBooksBookIdIndexRouteImport } from './routes/_app/c/$clubId/books/$bookId/index'
+import { Route as AppCClubIdBooksBookIdReviewRouteImport } from './routes/_app/c/$clubId/books/$bookId/review'
+import { Route as AppCClubIdBooksBookIdReviewsRouteImport } from './routes/_app/c/$clubId/books/$bookId/reviews'
 import { Route as AppCClubIdVotesRoundIdIndexRouteImport } from './routes/_app/c/$clubId/votes/$roundId/index'
 import { Route as AppCClubIdVotesRoundIdManageRouteImport } from './routes/_app/c/$clubId/votes/$roundId/manage'
 
@@ -90,11 +94,35 @@ const AppCClubIdSettingsRoute = AppCClubIdSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppCClubIdRouteRoute,
 } as any)
+const AppCClubIdBooksBookIdRouteRoute =
+  AppCClubIdBooksBookIdRouteRouteImport.update({
+    id: '/books/$bookId',
+    path: '/books/$bookId',
+    getParentRoute: () => AppCClubIdRouteRoute,
+  } as any)
 const AppCClubIdVotesNewRoute = AppCClubIdVotesNewRouteImport.update({
   id: '/votes/new',
   path: '/votes/new',
   getParentRoute: () => AppCClubIdRouteRoute,
 } as any)
+const AppCClubIdBooksBookIdIndexRoute =
+  AppCClubIdBooksBookIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AppCClubIdBooksBookIdRouteRoute,
+  } as any)
+const AppCClubIdBooksBookIdReviewRoute =
+  AppCClubIdBooksBookIdReviewRouteImport.update({
+    id: '/review',
+    path: '/review',
+    getParentRoute: () => AppCClubIdBooksBookIdRouteRoute,
+  } as any)
+const AppCClubIdBooksBookIdReviewsRoute =
+  AppCClubIdBooksBookIdReviewsRouteImport.update({
+    id: '/reviews',
+    path: '/reviews',
+    getParentRoute: () => AppCClubIdBooksBookIdRouteRoute,
+  } as any)
 const AppCClubIdVotesRoundIdIndexRoute =
   AppCClubIdVotesRoundIdIndexRouteImport.update({
     id: '/votes/$roundId/',
@@ -121,8 +149,12 @@ export interface FileRoutesByFullPath {
   '/c/$clubId/invite': typeof AppCClubIdInviteRoute
   '/c/$clubId/settings': typeof AppCClubIdSettingsRoute
   '/c/$clubId/': typeof AppCClubIdIndexRoute
+  '/c/$clubId/books/$bookId': typeof AppCClubIdBooksBookIdRouteRouteWithChildren
   '/c/$clubId/votes/new': typeof AppCClubIdVotesNewRoute
+  '/c/$clubId/books/$bookId/review': typeof AppCClubIdBooksBookIdReviewRoute
+  '/c/$clubId/books/$bookId/reviews': typeof AppCClubIdBooksBookIdReviewsRoute
   '/c/$clubId/votes/$roundId/manage': typeof AppCClubIdVotesRoundIdManageRoute
+  '/c/$clubId/books/$bookId/': typeof AppCClubIdBooksBookIdIndexRoute
   '/c/$clubId/votes/$roundId/': typeof AppCClubIdVotesRoundIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -138,7 +170,10 @@ export interface FileRoutesByTo {
   '/c/$clubId/settings': typeof AppCClubIdSettingsRoute
   '/c/$clubId': typeof AppCClubIdIndexRoute
   '/c/$clubId/votes/new': typeof AppCClubIdVotesNewRoute
+  '/c/$clubId/books/$bookId/review': typeof AppCClubIdBooksBookIdReviewRoute
+  '/c/$clubId/books/$bookId/reviews': typeof AppCClubIdBooksBookIdReviewsRoute
   '/c/$clubId/votes/$roundId/manage': typeof AppCClubIdVotesRoundIdManageRoute
+  '/c/$clubId/books/$bookId': typeof AppCClubIdBooksBookIdIndexRoute
   '/c/$clubId/votes/$roundId': typeof AppCClubIdVotesRoundIdIndexRoute
 }
 export interface FileRoutesById {
@@ -156,8 +191,12 @@ export interface FileRoutesById {
   '/_app/c/$clubId/invite': typeof AppCClubIdInviteRoute
   '/_app/c/$clubId/settings': typeof AppCClubIdSettingsRoute
   '/_app/c/$clubId/': typeof AppCClubIdIndexRoute
+  '/_app/c/$clubId/books/$bookId': typeof AppCClubIdBooksBookIdRouteRouteWithChildren
   '/_app/c/$clubId/votes/new': typeof AppCClubIdVotesNewRoute
+  '/_app/c/$clubId/books/$bookId/review': typeof AppCClubIdBooksBookIdReviewRoute
+  '/_app/c/$clubId/books/$bookId/reviews': typeof AppCClubIdBooksBookIdReviewsRoute
   '/_app/c/$clubId/votes/$roundId/manage': typeof AppCClubIdVotesRoundIdManageRoute
+  '/_app/c/$clubId/books/$bookId/': typeof AppCClubIdBooksBookIdIndexRoute
   '/_app/c/$clubId/votes/$roundId/': typeof AppCClubIdVotesRoundIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -175,8 +214,12 @@ export interface FileRouteTypes {
     | '/c/$clubId/invite'
     | '/c/$clubId/settings'
     | '/c/$clubId/'
+    | '/c/$clubId/books/$bookId'
     | '/c/$clubId/votes/new'
+    | '/c/$clubId/books/$bookId/review'
+    | '/c/$clubId/books/$bookId/reviews'
     | '/c/$clubId/votes/$roundId/manage'
+    | '/c/$clubId/books/$bookId/'
     | '/c/$clubId/votes/$roundId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -192,7 +235,10 @@ export interface FileRouteTypes {
     | '/c/$clubId/settings'
     | '/c/$clubId'
     | '/c/$clubId/votes/new'
+    | '/c/$clubId/books/$bookId/review'
+    | '/c/$clubId/books/$bookId/reviews'
     | '/c/$clubId/votes/$roundId/manage'
+    | '/c/$clubId/books/$bookId'
     | '/c/$clubId/votes/$roundId'
   id:
     | '__root__'
@@ -209,8 +255,12 @@ export interface FileRouteTypes {
     | '/_app/c/$clubId/invite'
     | '/_app/c/$clubId/settings'
     | '/_app/c/$clubId/'
+    | '/_app/c/$clubId/books/$bookId'
     | '/_app/c/$clubId/votes/new'
+    | '/_app/c/$clubId/books/$bookId/review'
+    | '/_app/c/$clubId/books/$bookId/reviews'
     | '/_app/c/$clubId/votes/$roundId/manage'
+    | '/_app/c/$clubId/books/$bookId/'
     | '/_app/c/$clubId/votes/$roundId/'
   fileRoutesById: FileRoutesById
 }
@@ -316,12 +366,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCClubIdSettingsRouteImport
       parentRoute: typeof AppCClubIdRouteRoute
     }
+    '/_app/c/$clubId/books/$bookId': {
+      id: '/_app/c/$clubId/books/$bookId'
+      path: '/books/$bookId'
+      fullPath: '/c/$clubId/books/$bookId'
+      preLoaderRoute: typeof AppCClubIdBooksBookIdRouteRouteImport
+      parentRoute: typeof AppCClubIdRouteRoute
+    }
     '/_app/c/$clubId/votes/new': {
       id: '/_app/c/$clubId/votes/new'
       path: '/votes/new'
       fullPath: '/c/$clubId/votes/new'
       preLoaderRoute: typeof AppCClubIdVotesNewRouteImport
       parentRoute: typeof AppCClubIdRouteRoute
+    }
+    '/_app/c/$clubId/books/$bookId/': {
+      id: '/_app/c/$clubId/books/$bookId/'
+      path: '/'
+      fullPath: '/c/$clubId/books/$bookId/'
+      preLoaderRoute: typeof AppCClubIdBooksBookIdIndexRouteImport
+      parentRoute: typeof AppCClubIdBooksBookIdRouteRoute
+    }
+    '/_app/c/$clubId/books/$bookId/review': {
+      id: '/_app/c/$clubId/books/$bookId/review'
+      path: '/review'
+      fullPath: '/c/$clubId/books/$bookId/review'
+      preLoaderRoute: typeof AppCClubIdBooksBookIdReviewRouteImport
+      parentRoute: typeof AppCClubIdBooksBookIdRouteRoute
+    }
+    '/_app/c/$clubId/books/$bookId/reviews': {
+      id: '/_app/c/$clubId/books/$bookId/reviews'
+      path: '/reviews'
+      fullPath: '/c/$clubId/books/$bookId/reviews'
+      preLoaderRoute: typeof AppCClubIdBooksBookIdReviewsRouteImport
+      parentRoute: typeof AppCClubIdBooksBookIdRouteRoute
     }
     '/_app/c/$clubId/votes/$roundId/': {
       id: '/_app/c/$clubId/votes/$roundId/'
@@ -340,10 +418,29 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppCClubIdBooksBookIdRouteRouteChildren {
+  AppCClubIdBooksBookIdReviewRoute: typeof AppCClubIdBooksBookIdReviewRoute
+  AppCClubIdBooksBookIdReviewsRoute: typeof AppCClubIdBooksBookIdReviewsRoute
+  AppCClubIdBooksBookIdIndexRoute: typeof AppCClubIdBooksBookIdIndexRoute
+}
+
+const AppCClubIdBooksBookIdRouteRouteChildren: AppCClubIdBooksBookIdRouteRouteChildren =
+  {
+    AppCClubIdBooksBookIdReviewRoute: AppCClubIdBooksBookIdReviewRoute,
+    AppCClubIdBooksBookIdReviewsRoute: AppCClubIdBooksBookIdReviewsRoute,
+    AppCClubIdBooksBookIdIndexRoute: AppCClubIdBooksBookIdIndexRoute,
+  }
+
+const AppCClubIdBooksBookIdRouteRouteWithChildren =
+  AppCClubIdBooksBookIdRouteRoute._addFileChildren(
+    AppCClubIdBooksBookIdRouteRouteChildren,
+  )
+
 interface AppCClubIdRouteRouteChildren {
   AppCClubIdInviteRoute: typeof AppCClubIdInviteRoute
   AppCClubIdSettingsRoute: typeof AppCClubIdSettingsRoute
   AppCClubIdIndexRoute: typeof AppCClubIdIndexRoute
+  AppCClubIdBooksBookIdRouteRoute: typeof AppCClubIdBooksBookIdRouteRouteWithChildren
   AppCClubIdVotesNewRoute: typeof AppCClubIdVotesNewRoute
   AppCClubIdVotesRoundIdManageRoute: typeof AppCClubIdVotesRoundIdManageRoute
   AppCClubIdVotesRoundIdIndexRoute: typeof AppCClubIdVotesRoundIdIndexRoute
@@ -353,6 +450,7 @@ const AppCClubIdRouteRouteChildren: AppCClubIdRouteRouteChildren = {
   AppCClubIdInviteRoute: AppCClubIdInviteRoute,
   AppCClubIdSettingsRoute: AppCClubIdSettingsRoute,
   AppCClubIdIndexRoute: AppCClubIdIndexRoute,
+  AppCClubIdBooksBookIdRouteRoute: AppCClubIdBooksBookIdRouteRouteWithChildren,
   AppCClubIdVotesNewRoute: AppCClubIdVotesNewRoute,
   AppCClubIdVotesRoundIdManageRoute: AppCClubIdVotesRoundIdManageRoute,
   AppCClubIdVotesRoundIdIndexRoute: AppCClubIdVotesRoundIdIndexRoute,
