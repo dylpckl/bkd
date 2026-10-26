@@ -61,10 +61,18 @@ export function authorLine(authors: string[]) {
   return `${authors[0]} and others`
 }
 
-export function googleBooksUrl(id: string) {
-  return id.startsWith('fixture-')
-    ? null
-    : `https://books.google.com/books?id=${encodeURIComponent(id)}`
+/** Where a book's details live, from the id it was saved with; null for fixtures. */
+export function bookSourceLink(id: string) {
+  if (id.startsWith('fixture-')) return null
+  if (id.startsWith('ol:'))
+    return {
+      href: `https://openlibrary.org/works/${encodeURIComponent(id.slice(3))}`,
+      label: 'Open Library',
+    }
+  return {
+    href: `https://books.google.com/books?id=${encodeURIComponent(id)}`,
+    label: 'Google Books',
+  }
 }
 
 const COVERS = [

@@ -1,11 +1,8 @@
-// GET/POST { q } → { results: Book[] }. Proxies Google Books with the server-side key.
+// GET/POST { q } → { results: Book[] }. Proxies Google Books with the server-side key,
+// falling back to Open Library when Google is down.
 import { corsHeaders, json, rateLimited } from '../_shared/http.ts'
 import { getUserId } from '../_shared/rest.ts'
-import {
-  NotConfiguredError,
-  UpstreamError,
-  searchBooks,
-} from '../_shared/books-source.ts'
+import { UpstreamError, searchBooks } from '../_shared/books-source.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS')
@@ -32,8 +29,6 @@ Deno.serve(async (req) => {
     const results = await searchBooks(q)
     return json({ results }, 200, { 'Cache-Control': 'private, max-age=60' })
   } catch (e) {
-    if (e instanceof NotConfiguredError)
-      return json({ error: 'search_not_configured' }, 503)
     console.error(e)
     return json(
       {

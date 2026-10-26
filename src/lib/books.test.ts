@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { authorLine, googleBooksUrl, publishedYear, readingTime } from './books'
+import { authorLine, bookSourceLink, publishedYear, readingTime } from './books'
 
 describe('book helpers', () => {
   it('estimates reading time like the mockup', () => {
@@ -13,8 +13,15 @@ describe('book helpers', () => {
     expect(authorLine(['A', 'B', 'C'])).toBe('A and others')
     expect(publishedYear('1969-01-01')).toBe('1969')
   })
-  it('has no Google link for fixture books', () => {
-    expect(googleBooksUrl('fixture-x')).toBeNull()
-    expect(googleBooksUrl('abc')).toBe('https://books.google.com/books?id=abc')
+  it('links to where the book came from', () => {
+    expect(bookSourceLink('fixture-x')).toBeNull()
+    expect(bookSourceLink('abc')).toEqual({
+      href: 'https://books.google.com/books?id=abc',
+      label: 'Google Books',
+    })
+    expect(bookSourceLink('ol:OL45804W')).toEqual({
+      href: 'https://openlibrary.org/works/OL45804W',
+      label: 'Open Library',
+    })
   })
 })

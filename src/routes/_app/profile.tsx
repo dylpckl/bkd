@@ -271,7 +271,7 @@ function AvatarPicker({
       }
     },
     onSuccess: () => refresh(),
-    onError: () => toast.error('Couldn�t use that photo. Try a JPEG or PNG.'),
+    onError: () => toast.error('Couldn’t use that photo. Try a JPEG or PNG.'),
   })
   const remove = useMutation({
     mutationFn: () => setPath(null),
