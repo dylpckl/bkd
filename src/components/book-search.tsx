@@ -57,6 +57,10 @@ export function BookSearch({
     enabled: open && q.length >= 2,
     staleTime: 5 * 60_000,
     placeholderData: (prev) => prev,
+    // search-books already retries Google and falls back to Open Library, so a
+    // failure here is final. Retrying in the browser too multiplied every
+    // failed search into up to 12 upstream calls and used up the rate limit.
+    retry: false,
   })
 
   const nominatedBy = new Map(
