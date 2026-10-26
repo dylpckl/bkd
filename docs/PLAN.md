@@ -52,6 +52,7 @@ Smaller copy and style notes are listed in **§7 Mockup → spec reconciliation*
 - **The "12 new posts" chip** on the Currently reading card is left out until there's read tracking (P6, with realtime).
 - **Accessibility is checked with axe** (WCAG 2.1 A/AA) on the main screens in e2e, in place of a Lighthouse run, which isn't available in CI.
 - **Slow loads show a skeleton, failed loads show "Something went wrong · Try again"**, as router defaults, so every screen has both.
+- **Book search falls back to Open Library.** Google Books returns 503 for minutes at a time, even with a key. Each Google request is retried twice (after about 250ms, then 750ms); if it still fails, search uses Open Library instead. Those books are saved with an `ol:` id prefix in the same column. If nominating can't reach either source, it uses the copy already saved in `books` when someone has nominated that book before.
 - **shadcn/ui components were copied from the upstream GitHub source**, because the shadcn registry host is blocked in the build environment. Add new ones the same way, or with `pnpm dlx shadcn add` where it's reachable.
 
 ---

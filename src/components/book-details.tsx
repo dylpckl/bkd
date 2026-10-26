@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { BookCover } from '#/components/book-cover'
 import {
   authorLine,
-  googleBooksUrl,
+  bookSourceLink,
   publishedYear,
   readingTime,
 } from '#/lib/books'
@@ -13,7 +13,7 @@ export function BookDetails({ book }: { book: BookInfo }) {
   const [expanded, setExpanded] = useState(false)
   const year = publishedYear(book.published_date)
   const hours = readingTime(book.page_count)
-  const link = googleBooksUrl(book.google_books_id)
+  const link = bookSourceLink(book.google_books_id)
   const facts = [
     year && { value: year, label: 'published' },
     book.page_count && { value: String(book.page_count), label: 'pages' },
@@ -102,8 +102,8 @@ export function BookDetails({ book }: { book: BookInfo }) {
             {edition}
             {edition && link && ' · '}
             {link && (
-              <a href={link} target="_blank" rel="noreferrer">
-                Google Books ↗
+              <a href={link.href} target="_blank" rel="noreferrer">
+                {link.label} ↗
               </a>
             )}
           </span>
