@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   closestCenter,
   useSensor,
@@ -161,8 +161,10 @@ export function BallotList({
     n: Nomination,
   ) => { id: string; name: string; src: string | null } | null
 }) {
+  // Mouse + Touch, not Pointer + Touch: on phones the pointer sensor claims the
+  // touch first, then the browser cancels it to scroll, so dragging did nothing.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, {
       activationConstraint: { delay: 150, tolerance: 6 },
     }),
