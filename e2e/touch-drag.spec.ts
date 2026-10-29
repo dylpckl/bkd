@@ -86,12 +86,24 @@ test('on a phone, press and drag a book to rank it, which casts the vote', async
 
   const order = await ballotTitles(adam)
   expect([...order].sort()).toEqual(['Piranesi', 'Project Hail Mary'])
-  // The rows' <li> use display: contents, so aim at each row's drag handle.
-  const handles = adam.getByRole('button', { name: /^Reorder / })
-  await touchDrag(adam, handles.nth(1), handles.nth(0))
+  // Press anywhere on the card, not just the handle: here, on the second book's title.
+  const ballot = adam.getByRole('list', { name: 'Your ranked ballot' })
+  const title = (t: string) => ballot.locator('strong', { hasText: t })
+  await touchDrag(adam, title(order[1]), title(order[0]))
 
   await expect(adam.getByText('✓ Saved')).toBeVisible()
   expect(await ballotTitles(adam)).toEqual([order[1], order[0]])
+  // Letting go after the drag doesn't count as a tap that opens the book.
+  await expect(adam.getByRole('dialog')).toHaveCount(0)
   await adam.reload()
   expect(await ballotTitles(adam)).toEqual([order[1], order[0]])
+
+  // The handle still works too: move it back.
+  const handles = adam.getByRole('button', { name: /^Reorder / })
+  await touchDrag(adam, handles.nth(1), handles.nth(0))
+  await expect.poll(() => ballotTitles(adam)).toEqual(order)
+
+  // A plain tap on a book still opens its details.
+  await title(order[0]).tap()
+  await expect(adam.getByRole('dialog')).toBeVisible()
 })

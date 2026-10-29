@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
@@ -294,13 +294,30 @@ function Row({
   const top = index < 3
   const style = { transform: CSS.Transform.toString(transform), transition }
 
+  // Lifting the finger after a drag that started on the book can land as a tap
+  // and open its details; swallow that one click.
+  const dragged = useRef(false)
+  useEffect(() => {
+    if (isDragging) dragged.current = true
+  }, [isDragging])
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...(isStatic ? {} : listeners)}
+      // Long-pressing the card is how a drag starts; don't let the phone open its
+      // own long-press menu (copy text, save image) over it.
+      onContextMenu={isStatic ? undefined : (e) => e.preventDefault()}
+      // Each new press starts clean, so a drag from the handle (no stray tap) doesn't
+      // eat the next real tap on the book.
+      onPointerDown={() => {
+        dragged.current = false
+      }}
       className={cn(
-        'bg-card relative flex min-h-15 touch-manipulation items-center gap-2.5 rounded-xl border px-2.5 py-2 select-none',
+        // The whole card is the drag target. Covers can't be dragged or long-pressed
+        // on their own, and no text callout appears, so a press anywhere starts the drag.
+        'bg-card relative flex min-h-15 touch-manipulation items-center gap-2.5 rounded-xl border px-2.5 py-2 select-none [-webkit-touch-callout:none] [&_img]:pointer-events-none',
         index === 0 &&
           !isStatic &&
           'border-primary bg-[#EEF6F0] border-2 px-[9px] py-[7px]',
@@ -321,7 +338,13 @@ function Row({
       </span>
       <button
         type="button"
-        onClick={() => onOpen(r)}
+        onClick={() => {
+          if (dragged.current) {
+            dragged.current = false
+            return
+          }
+          onOpen(r)
+        }}
         className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
       >
         <BookCover
